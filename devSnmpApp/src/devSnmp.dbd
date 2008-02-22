@@ -1,0 +1,19 @@
+# Include external dbds if required
+##
+device(ai,INST_IO,devAiSnmpV1,"SnmpV1")
+device(longin,INST_IO,devLiSnmpV1,"SnmpV1")
+device(stringin,INST_IO,devSiSnmpV1,"SnmpV1")
+device(waveform,INST_IO,devWfSnmpV1,"SnmpV1")
+
+device(ai,INST_IO,devAiSnmpV2c,"Snmp")
+device(longin,INST_IO,devLiSnmpV2c,"Snmp")
+device(stringin,INST_IO,devSiSnmpV2c,"Snmp")
+device(waveform,INST_IO,devWfSnmpV2c,"Snmp")
+
+device(ai,INST_IO,devAiSnmpV2c,"SnmpV2c")
+device(longin,INST_IO,devLiSnmpV2c,"SnmpV2c")
+device(stringin,INST_IO,devSiSnmpV2c,"SnmpV2c")
+device(waveform,INST_IO,devWfSnmpV2c,"SnmpV2c")
+
+driver(drvSnmp)
+

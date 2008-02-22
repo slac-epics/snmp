@@ -1,0 +1,4 @@
+snmp-R1-0-0:
+The first release of the new devSnmp
+Built against EPICS R3.14.9 and linux-x86
+Uses net-snmp linux module
