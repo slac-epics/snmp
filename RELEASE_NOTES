@@ -1,8 +1,26 @@
-snmp-R1-0-1:
-First production Release
-Read only support
+#==============================================================
+#
+#  Name: RELEASE_NOTES
+#
+#  Rem: This files describes release notes for
+#       the snmp package 
+#
+#  Auth: dd-mmm-yyyy, Author's  Name     (USERNAME)
+#  Rev:  dd-mmm-yyyy, Reviewer's Name    (USERNAME)
+#--------------------------------------------------------------
+#  Mod:
+#        28-Apr-2009, K. Luchini         (LUCHINI):
+#          release  snmp-R2-0-0
+#
+#==============================================================
+#
+snmp-R2-0-0:  Build with rtems-4.9.1
+              Build with epics-R3.14.8.3
 
-snmp-R1-0-0:
-The first release of the new devSnmp
-Built against EPICS R3.14.9 and linux-x86
-Uses net-snmp linux module
+snmp-R1-0-1:  First production Release
+              Read only support
+
+snmp-R1-0-0:  The first release of the new devSnmp
+              Built against EPICS R3.14.9 and linux-x86
+              Uses net-snmp linux module
+
