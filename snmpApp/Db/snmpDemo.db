@@ -1,0 +1,30 @@
+record (longin,"snmp_ai")
+{
+	field (DTYP,"Snmp$(VER)")
+	field (INP,"@$(HOST) $(COMMUNITY) IF-MIB::ifInUcastPkts.1 Counter32: 11")
+        field (SCAN,"5 second")
+}
+
+record (longin,"snmp_li")
+{
+	field (DTYP,"Snmp$(VER)")
+	field (INP,"@$(HOST) $(COMMUNITY) IF-MIB::ifInUcastPkts.1 Counter32: 11")
+        field (SCAN,"5 second")
+}
+
+record (stringin, "snmp_si")
+{
+        field (DTYP,"Snmp$(VER)")
+        field (INP,"@$(HOST) $(COMMUNITY) system.sysDescr.0  STRING: 100")
+        field (SCAN,"5 second")
+}
+
+record (waveform, "snmp_wf")
+{
+        field (DTYP,"Snmp$(VER)")
+        field (INP,"@$(HOST) $(COMMUNITY) system.sysDescr.0  STRING: 100")
+        field (SCAN,"5 second")
+        field (NELM,"100")
+        field (FTVL,"CHAR")
+}
+
