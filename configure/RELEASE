@@ -21,6 +21,20 @@ ifndef EPICS_SITE_CONFIG
 $(error EPICS_SITE_CONFIG undefined)
 endif
 
+# ===============================================================
+# Define version of "meta" modules - BASE and EXTENSIONS.  Must
+# be defined before loading $(EPICS_SITE_CONFIG)
+# ===============================================================
+BASE_MODULE_VERSION=R3.14.9-0.1.0
+EXTENSIONS_MODULE_VERSION=R3.14.9-0.1.0
+
+# ===============================================================
+# Define version of "meta" modules - BASE and EXTENSIONS.  Must
+# be defined before loading $(EPICS_SITE_CONFIG)
+# ===============================================================
+BASE_MODULE_VERSION=R3.14.9-0.1.0
+EXTENSIONS_MODULE_VERSION=R3.14.9-0.1.0
+
 # Site configuration, if it does not exist, no big deal
 include $(EPICS_SITE_CONFIG)
 
