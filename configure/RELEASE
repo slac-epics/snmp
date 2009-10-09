@@ -25,29 +25,13 @@ endif
 # Define version of "meta" modules - BASE and EXTENSIONS.  Must
 # be defined before loading $(EPICS_SITE_CONFIG)
 # ===============================================================
-BASE_MODULE_VERSION=R3.14.9-0.1.0
-EXTENSIONS_MODULE_VERSION=R3.14.9-0.1.0
-
-# ===============================================================
-# Define version of "meta" modules - BASE and EXTENSIONS.  Must
-# be defined before loading $(EPICS_SITE_CONFIG)
-# ===============================================================
-BASE_MODULE_VERSION=R3.14.9-0.1.0
-EXTENSIONS_MODULE_VERSION=R3.14.9-0.1.0
+BASE_MODULE_VERSION=R3.14.9-0.2.0
+EXTENSIONS_MODULE_VERSION=R3.14.9-0.4.0
 
 # Site configuration, if it does not exist, no big deal
 include $(EPICS_SITE_CONFIG)
-
-# ===============================================================
-# Define the version of modules needed by
-# IOC apps or other Support apps
-# ===============================================================
-# NOTE: do not set, if you need a specific version it should be set
-# in RELEASE_SITE otherwise it will be set by release script.
 
 # ============================================================
 # External Support
 # ============================================================
 # example: IPAC=$(EPICS_MODULES)/ipac/$(IPAC_MODULE_VERSION)
-# NOTE: it is normal for IPAC_MODULE_VERSION not to be defined, it will
-# be inserted by the release script.
