@@ -14,6 +14,10 @@
 #
 #==============================================================
 #
+snmp-R2-1-0:  Built against rtems 4.9.3 and EPICS BASE:
+              base-R3-14-8-2-lcls5
+
+
 snmp-R2-0-0:  Build with rtems-4.9.1
               Build with epics-R3.14.8.3
 

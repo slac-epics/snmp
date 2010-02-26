@@ -7,5 +7,5 @@
 # We will build some tools/scripts that allow us to
 # change this easily when relocating software.
 # ==============================================================
-EPICS_SITE_TOP=/usr/local/lcls/epics
+EPICS_SITE_TOP=/afs/slac/g/lcls/epics
 
