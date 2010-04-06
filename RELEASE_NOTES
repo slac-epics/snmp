@@ -1,3 +1,13 @@
+R1-1:
+Rename some variables to support command
+Add write support
+Add WIENER-CRATE-MIB.txt, please copy to /usr/share/snmp/mibs/
+Add snmpWienerDemo.db
+Correct record type in snmpDemo.db
+New test st.cmd
+In drvSnmp.c, read all MIBs, check return of snmp_add_null_var, add one more error code for command no answer
+In devSnmp.c, search : backwards, add initial readback to output records, don't use %*, skip non-digit when parse integer
+
 snmp-R1-0-1:
 First production Release
 Read only support

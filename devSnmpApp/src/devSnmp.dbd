@@ -15,5 +15,17 @@ device(longin,INST_IO,devLiSnmpV2c,"SnmpV2c")
 device(stringin,INST_IO,devSiSnmpV2c,"SnmpV2c")
 device(waveform,INST_IO,devWfSnmpV2c,"SnmpV2c")
 
+device(ao,INST_IO,devAoSnmpV1,"SnmpV1")
+device(longout,INST_IO,devLoSnmpV1,"SnmpV1")
+device(stringout,INST_IO,devSoSnmpV1,"SnmpV1")
+
+device(ao,INST_IO,devAoSnmpV2c,"Snmp")
+device(longout,INST_IO,devLoSnmpV2c,"Snmp")
+device(stringout,INST_IO,devSoSnmpV2c,"Snmp")
+
+device(ao,INST_IO,devAoSnmpV2c,"SnmpV2c")
+device(longout,INST_IO,devLoSnmpV2c,"SnmpV2c")
+device(stringout,INST_IO,devSoSnmpV2c,"SnmpV2c")
+
 driver(drvSnmp)
 

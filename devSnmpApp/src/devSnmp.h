@@ -1,5 +1,3 @@
-/***************************************************************************/
-/*   $Id: devSnmp.h,v 1.1.1.1 2008/02/22 19:50:56 ernesto Exp $                   */
 /***************************************************************************\
  *   File:              devSNMP.h
  *   Author:            Sheng Peng
@@ -50,8 +48,11 @@
 #include <devLib.h>
 
 #include <aiRecord.h>
+#include <aoRecord.h>
 #include <stringinRecord.h>
+#include <stringoutRecord.h>
 #include <longinRecord.h>
+#include <longoutRecord.h>
 #include <waveformRecord.h>
 
 #else
@@ -98,29 +99,35 @@ typedef struct SNMP_AGENT
     void 			*pSess;  /* <-- an opaque pointer, not a struct pointer */
     struct snmp_session		*pActiveSession;
 
-    ELLLIST			snmpQryPtrList;
+    ELLLIST			snmpReqPtrList;
 
     epicsMessageQueueId		msgQ_id;        /* Through this message queue, record processing sends request to opthread */
     epicsThreadId		opthread_id;    /* operation thread ID for this snmp agent */
     char			opthread_name[MAX_CA_STRING_SIZE];
 
-    struct snmp_pdu		*reqPdu;
+    struct snmp_pdu		*reqQryPdu;
+    struct snmp_pdu		*reqCmdPdu;
 
     int				status;		/* not really used, reserved for future */
 
 } SNMP_AGENT;
 
-/* ObjectID to query */
+/* ObjectID to request */
 typedef struct OID
 {
-    char		*queryName;
-    oid			queryOid[MAX_OID_LEN];
-    unsigned int	queryOidLen;
+    char		*requestName;
+    oid			requestOid[MAX_OID_LEN];
+    size_t		requestOidLen;
 } OID;
 
-typedef struct SNMP_QUERY
+typedef struct SNMP_REQUEST
 {
     ELLNODE		node;	/* Link List Node */
+
+    int                 cmd;	/* 0: query; 1: command */
+    char                type;	/* i: INTEGER, u: unsigned INTEGER, t: TIMETICKS, a: IPADDRESS */
+    				/* o: OBJID, s: STRING, x: HEX STRING, d: DECIMAL STRING, b: BITS */
+    				/* U: unsigned int64, I: signed int64, F: float, D: double */
 
     dbCommon		*pRecord;
     SNMP_AGENT		*pSnmpAgent;
@@ -134,28 +141,32 @@ typedef struct SNMP_QUERY
 
     int			cnt;
     char		*mask;
-} SNMP_QUERY;
+} SNMP_REQUEST;
 
-#define SNMP_QUERY_NO_ERR 0
-#define SNMP_QUERY_PDU_ERR 0x00010000
-#define SNMP_QUERY_SNMP_ERR 0x00020000
-#define SNMP_QUERY_QRY_TOUT 0x00030000
-#define SNMP_QUERY_QRY_NOANS 0x00040000
-#define SNMP_QUERY_CVT_ERR 0x00050000	/* conversion failed, usually because the buffer is not big enough */
+#define SNMP_REQUEST_NO_ERR	0
+#define SNMP_REQUEST_PDU_ERR	0x00010000
+#define SNMP_REQUEST_ADDVAR_ERR	0x00020000
+#define SNMP_REQUEST_SNMP_ERR	0x00030000
+#define SNMP_REQUEST_QRY_TOUT	0x00040000
+#define SNMP_REQUEST_CMD_TOUT	0x00050000
+#define SNMP_REQUEST_QRY_NOANS	0x00060000
+#define SNMP_REQUEST_CMD_NOANS	0x00070000
+#define SNMP_REQUEST_CVT_ERR	0x00080000	/* conversion failed, usually because the buffer is not big enough */
 
-typedef struct SNMP_QRYPTR
+typedef struct SNMP_REQPTR
 {
     ELLNODE	node;	/* Link List Node */
-    SNMP_QUERY  *pQuery;
-} SNMP_QRYPTR;
+    SNMP_REQUEST  *pRequest;
+} SNMP_REQPTR;
 
-typedef struct SNMP_QRYINFO
+typedef struct SNMP_REQINFO
 {
-    SNMP_QRYPTR qryptr;
-    SNMP_QUERY  query;
-} SNMP_QRYINFO;
+    SNMP_REQPTR reqptr;
+    SNMP_REQUEST  request;
+} SNMP_REQINFO;
 
-int snmpQueryInit(dbCommon * pRecord, const char * ioString, long snmpVersion, size_t valStrLen);
+int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion, size_t valStrLen, int cmd, char type);
+int snmpQuerySingleVar(SNMP_REQUEST * pRequest);
 
 #ifdef __cplusplus
 }

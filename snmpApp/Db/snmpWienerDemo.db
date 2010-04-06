@@ -1,0 +1,49 @@
+record (ai,"Wiener:Currentof5V")
+{
+	field (DTYP,"Snmp$(VER)")
+	field (INP,"@$(HOST) $(COMMUNITY) WIENER-CRATE-MIB::outputMeasurementCurrent.U0")
+        field (SCAN,"5 second")
+}
+
+record (longin,"Wiener:Fan1Speed")
+{
+	field (DTYP,"Snmp$(VER)")
+	field (INP,"@$(HOST) $(COMMUNITY) WIENER-CRATE-MIB::fanSpeed.1")
+        field (SCAN,"5 second")
+}
+
+record (stringin, "Wiener:SysDescStr")
+{
+        field (DTYP,"Snmp$(VER)")
+        field (INP,"@$(HOST) $(COMMUNITY) sysDescr.0  STRING: 100")
+        field (SCAN,"5 second")
+}
+
+record (waveform, "Wiener:SysDesc")
+{
+        field (DTYP,"Snmp$(VER)")
+        field (INP,"@$(HOST) $(COMMUNITY) sysDescr.0  STRING: 100")
+        field (SCAN,"5 second")
+        field (NELM,"100")
+        field (FTVL,"CHAR")
+}
+
+record (longin,"Wiener:PowerStatus")
+{
+	field (DTYP,"Snmp$(VER)")
+	field (INP,"@$(HOST) $(COMMUNITY) WIENER-CRATE-MIB::sysMainSwitch.0")
+        field (SCAN,"5 second")
+}
+
+record (longout,"Wiener:Power")
+{
+	field (DTYP,"Snmp$(VER)")
+	field (OUT,"@$(HOST) $(COMMUNITY) WIENER-CRATE-MIB::sysMainSwitch.0")
+}
+
+record (longout,"Wiener:VMEReset")
+{
+	field (DTYP,"Snmp$(VER)")
+	field (OUT,"@$(HOST) $(COMMUNITY) WIENER-CRATE-MIB::sysVmeSysReset.0")
+}
+

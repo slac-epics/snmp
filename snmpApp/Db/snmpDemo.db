@@ -1,4 +1,4 @@
-record (longin,"snmp_ai")
+record (ai,"snmp_ai")
 {
 	field (DTYP,"Snmp$(VER)")
 	field (INP,"@$(HOST) $(COMMUNITY) IF-MIB::ifInUcastPkts.1 Counter32: 11")
