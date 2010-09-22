@@ -7,7 +7,6 @@ EPICS_SITE_TOP=/reg/g/pcds/package/epics/3.14
 
 # EPICS module releases are kept here
 EPICS_MODULES=$(EPICS_SITE_TOP)/modules
-EPICS_BASE=$(EPICS_SITE_TOP)/base/$(BASE_MODULE_VERSION)
 
 # Use the latest version of msi to avoid dependency on the extensions version
 MSI=$(EPICS_SITE_TOP)/extensions/current/bin/$(EPICS_HOST_ARCH)/msi
