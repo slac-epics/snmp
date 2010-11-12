@@ -167,7 +167,7 @@ static long read_ai_snmp(struct aiRecord *pai)
         }
         else
         {
-            if(SNMP_DEV_DEBUG)   printf("Record [%s] receives string [%s]!\n", pai->name, pRequest->pValStr);
+            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] receives string [%s]!\n", pai->name, pRequest->pValStr);
 
             pValStr = strrchr(pRequest->pValStr, ':');
             if(pValStr == NULL) pValStr = pRequest->pValStr;
@@ -355,7 +355,7 @@ static long read_li_snmp(struct longinRecord *pli)
         }
         else
         {
-            if(SNMP_DEV_DEBUG)   printf("Record [%s] receives string [%s]!\n", pli->name, pRequest->pValStr);
+            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] receives string [%s]!\n", pli->name, pRequest->pValStr);
 
             pValStr = strrchr(pRequest->pValStr, ':');
             if(pValStr == NULL) pValStr = pRequest->pValStr;
@@ -552,7 +552,7 @@ static long read_si_snmp(struct stringinRecord *psi)
         }
         else
         {
-            if(SNMP_DEV_DEBUG)   printf("Record [%s] receives string [%s]!\n", psi->name, pRequest->pValStr);
+            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] receives string [%s]!\n", psi->name, pRequest->pValStr);
 
             if((pValStr = strrchr(pRequest->pValStr, ':')) != NULL)
             {
@@ -769,7 +769,7 @@ static long read_wf_snmp(struct waveformRecord *pwf)
         }
         else
         {
-            if(SNMP_DEV_DEBUG)   printf("Record [%s] receives string [%s]!\n", pwf->name, pRequest->pValStr);
+            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] receives string [%s]!\n", pwf->name, pRequest->pValStr);
 
             switch(pwf->ftvl)
             {

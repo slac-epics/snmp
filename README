@@ -2,3 +2,8 @@ To compile on linux, install the net-snmp-devel linux module
 
 Please see document directory for more info.
 
+New feature added by SLAC pcds group 11/12/2010.
+Some snmp controlled devices use 'F' instead of 'D' for the
+snmp type character when setting values via snmp cmds.
+This change allows an optional character at the end of
+the INP/OUT iostring to specify the type character.

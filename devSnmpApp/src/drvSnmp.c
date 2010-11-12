@@ -54,7 +54,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
         }
         else
         {/* some requests come in */
-            if(SNMP_DRV_DEBUG) printf("Oper task for agent[%s] gets requests!\n", pSnmpAgent->pActiveSession->peername);
+            if(SNMP_DRV_DEBUG > 1) printf("Oper task for agent[%s] gets requests!\n", pSnmpAgent->pActiveSession->peername);
 
             /* Figure out how many requests in queue */
             NofReqs = epicsMessageQueuePending(pSnmpAgent->msgQ_id);
@@ -248,7 +248,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
                             else
                                 strcpy(pBuf, "(none)");
 
-                            sprintf(pErrBuf, "snmp_sess_synch_response: errindex %ld, %s %s %s\n",
+                            sprintf(pErrBuf, "\nrequestCmdList: snmp_sess_synch_response: errindex %ld\n\t%s %s %s\n",
                                 respCmdPdu->errindex, pSnmpAgent->pActiveSession->peername, pRequest->objectId.requestName, pBuf);
                             errlogPrintf("%s", pErrBuf);
                             snmp_sess_perror(pErrBuf, pSnmpAgent->pActiveSession);
@@ -326,7 +326,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
                 {
                     snmp_free_pdu(respCmdPdu);
                     respCmdPdu = NULL;
-                    if(SNMP_DRV_DEBUG) printf("Oper task for agent[%s] frees PDU!\n", pSnmpAgent->pActiveSession->peername);
+                    if(SNMP_DRV_DEBUG > 1) printf("Oper task for agent[%s] frees PDU!\n", pSnmpAgent->pActiveSession->peername);
                 }
 
             }/* Command PDU */
@@ -444,7 +444,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
                             else
                                 strcpy(pBuf, "(none)");
 
-                            sprintf(pErrBuf, "snmp_sess_synch_response: errindex %ld, %s %s %s\n",
+                            sprintf(pErrBuf, "\nrequestQryList: snmp_sess_synch_response: errindex %ld\n\t%s %s %s\n",
                                 respQryPdu->errindex, pSnmpAgent->pActiveSession->peername, pRequest->objectId.requestName, pBuf);
                             errlogPrintf("%s", pErrBuf);
                             snmp_sess_perror(pErrBuf, pSnmpAgent->pActiveSession);
@@ -522,7 +522,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
                 {
                     snmp_free_pdu(respQryPdu);
                     respQryPdu = NULL;
-                    if(SNMP_DRV_DEBUG) printf("Oper task for agent[%s] frees PDU!\n", pSnmpAgent->pActiveSession->peername);
+                    if(SNMP_DRV_DEBUG > 1) printf("Oper task for agent[%s] frees PDU!\n", pSnmpAgent->pActiveSession->peername);
                 }
 
             }/* Query PDU */
@@ -548,6 +548,7 @@ int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion,
     char peerName[81];
     char community[81];
     char oidStr[81];
+	char	typeFromIO	= '?';
 
     int n;
 
@@ -574,9 +575,17 @@ int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion,
     if(snmpVersion != SNMP_VERSION_1 && snmpVersion != SNMP_VERSION_3)
         snmpVersion = SNMP_VERSION_2c;
 
-    n = sscanf(ioString, "%s %s %s", peerName, community, oidStr);
-    if(n != 3) return -1;
-    if(SNMP_DRV_DEBUG) printf("Query: Agent[%s], Community[%s], OIDStr[%s]\n", peerName, community, oidStr);
+    n = sscanf(ioString, "%s %s %s %c", peerName, community, oidStr, &typeFromIO );
+    if ( n < 3 )
+	{
+		errlogPrintf( "snmpRequestInit Error: Invalid INP/OUT string: %s\n", ioString );
+		return -1;
+	}
+	if ( n == 4 && typeFromIO != '?' )
+	{
+		type	= typeFromIO;
+	}
+    if(SNMP_DRV_DEBUG) printf( "Query: Agent[%s], Community[%s], OIDStr[%s], Type %c\n", peerName, community, oidStr, type );
 
     /* Check if the agent is already in our list, or else add it */
     epicsMutexLock(snmpAgentListLock);
@@ -786,7 +795,7 @@ int snmpQuerySingleVar(SNMP_REQUEST * pRequest)
                 else
                     strcpy(pBuf, "(none)");
 
-                sprintf(pErrBuf, "snmp_sess_synch_response: errindex %ld, %s %s %s\n",
+					sprintf(pErrBuf, "\nsnmpQuerySingleVar: snmp_sess_synch_response: errindex %ld\n\t%s %s %s\n",
                     respQryPdu->errindex, pRequest->pSnmpAgent->pActiveSession->peername, pRequest->objectId.requestName, pBuf);
                 errlogPrintf("%s", pErrBuf);
                 snmp_sess_perror(pErrBuf, pRequest->pSnmpAgent->pActiveSession);
