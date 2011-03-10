@@ -147,7 +147,7 @@ static long read_ai_snmp(struct aiRecord *pai)
         if(epicsMessageQueueTrySend(pRequest->pSnmpAgent->msgQ_id, (void *)&pRequest, sizeof(SNMP_REQUEST *)) == -1)
         {
             recGblSetSevr(pai, READ_ALARM, INVALID_ALARM);
-            errlogPrintf("Send Message to Snmp Operation Thread Error [%s]", pai->name);
+            errlogPrintf("read_ai_snmp: epicsMessageQueueTrySend Error [%s]\n", pai->name);
             rtn = -1;
         }
         else
@@ -215,7 +215,7 @@ static long init_ao_snmp(struct aoRecord *pao, long snmpVersion)
     pRequest = (SNMP_REQUEST *)(pao->dpvt);
     if(0 == snmpQuerySingleVar(pRequest))
     {
-        if(SNMP_DEV_DEBUG)   printf("Record [%s] receives string [%s] during init!\n", pao->name, pRequest->pValStr);
+        if(SNMP_DEV_DEBUG)   printf("Record [%s] received string [%s] during init.\n", pao->name, pRequest->pValStr);
         pValStr = strrchr(pRequest->pValStr, ':');
         if(pValStr == NULL) pValStr = pRequest->pValStr;
         else pValStr++;
@@ -262,7 +262,7 @@ static long write_ao_snmp(struct aoRecord *pao)
         if(epicsMessageQueueTrySend(pRequest->pSnmpAgent->msgQ_id, (void *)&pRequest, sizeof(SNMP_REQUEST *)) == -1)
         {
             recGblSetSevr(pao, WRITE_ALARM, INVALID_ALARM);
-            errlogPrintf("Send Message to Snmp Operation Thread Error [%s]", pao->name);
+            errlogPrintf("write_ao_snmp: epicsMessageQueueTrySend Error [%s]\n", pao->name);
             return -1;
         }
         else
@@ -335,7 +335,7 @@ static long read_li_snmp(struct longinRecord *pli)
         if(epicsMessageQueueTrySend(pRequest->pSnmpAgent->msgQ_id, (void *)&pRequest, sizeof(SNMP_REQUEST *)) == -1)
         {
             recGblSetSevr(pli, READ_ALARM, INVALID_ALARM);
-            errlogPrintf("Send Message to Snmp Operation Thread Error [%s]", pli->name);
+            errlogPrintf("read_li_snmp: epicsMessageQueueTrySend Error on [%s]\n", pli->name);
             rtn = -1;
         }
         else
@@ -362,20 +362,22 @@ static long read_li_snmp(struct longinRecord *pli)
             else pValStr++;
 
             /* skip non-digit, particularly because of WIENER crate has ON(1), OFF(0) */
-            for (; isdigit(*pValStr) == 0 && *pValStr != '\0'; ) ++pValStr;
+            for (; isdigit(*pValStr) == 0 && *pValStr != '\0'; )
+				++pValStr;
+
             /* The longin record for snmp only handles unsigned int */
             if (pValStr && sscanf(pValStr, "%u", &u32temp))
             {
                 pli->val = u32temp&0x7FFFFFFF;	/* Get rid of MSB since pli->val is signed */
                 pli->udf = FALSE;
-	        rtn = 0;
-	    }
+				rtn = 0;
+			}
             else
             {
                 recGblSetSevr(pli, READ_ALARM, INVALID_ALARM);
                 errlogPrintf("Record [%s] parsing response [%s] error!\n", pli->name, pValStr);
-	        rtn = -1;
-	    }
+				rtn = -1;
+			}
         }
     }/* post-process */
 
@@ -409,7 +411,7 @@ static long init_lo_snmp(struct longoutRecord *plo, long snmpVersion)
     pRequest = (SNMP_REQUEST *)(plo->dpvt);
     if(0 == snmpQuerySingleVar(pRequest))
     {
-        if(SNMP_DEV_DEBUG)   printf("Record [%s] receives string [%s] during init!\n", plo->name, pRequest->pValStr);
+        if(SNMP_DEV_DEBUG)   printf("Record [%s] received string [%s] during init.\n", plo->name, pRequest->pValStr);
         pValStr = strrchr(pRequest->pValStr, ':');
         if(pValStr == NULL) pValStr = pRequest->pValStr;
         else pValStr++;
@@ -459,7 +461,7 @@ static long write_lo_snmp(struct longoutRecord *plo)
         if(epicsMessageQueueTrySend(pRequest->pSnmpAgent->msgQ_id, (void *)&pRequest, sizeof(SNMP_REQUEST *)) == -1)
         {
             recGblSetSevr(plo, WRITE_ALARM, INVALID_ALARM);
-            errlogPrintf("Send Message to Snmp Operation Thread Error [%s]", plo->name);
+            errlogPrintf("write_lo_snmp: epicsMessageQueueTrySend Error [%s]\n", plo->name);
             return -1;
         }
         else
@@ -532,7 +534,7 @@ static long read_si_snmp(struct stringinRecord *psi)
         if(epicsMessageQueueTrySend(pRequest->pSnmpAgent->msgQ_id, (void *)&pRequest, sizeof(SNMP_REQUEST *)) == -1)
         {
             recGblSetSevr(psi, READ_ALARM, INVALID_ALARM);
-            errlogPrintf("Send Message to Snmp Operation Thread Error [%s]", psi->name);
+            errlogPrintf("read_si_snmp: epicsMessageQueueTrySend Error [%s]\n", psi->name);
             rtn = -1;
         }
         else
@@ -611,7 +613,7 @@ static long init_so_snmp(struct stringoutRecord *pso, long snmpVersion)
     pRequest = (SNMP_REQUEST *)(pso->dpvt);
     if(0 == snmpQuerySingleVar(pRequest))
     {
-        if(SNMP_DEV_DEBUG)   printf("Record [%s] receives string [%s] during init!\n", pso->name, pRequest->pValStr);
+        if(SNMP_DEV_DEBUG)   printf("Record [%s] received string [%s] during init.\n", pso->name, pRequest->pValStr);
 
         if((pValStr = strrchr(pRequest->pValStr, ':')) != NULL)
         {
@@ -667,7 +669,7 @@ static long write_so_snmp(struct stringoutRecord *pso)
         if(epicsMessageQueueTrySend(pRequest->pSnmpAgent->msgQ_id, (void *)&pRequest, sizeof(SNMP_REQUEST *)) == -1)
         {
             recGblSetSevr(pso, WRITE_ALARM, INVALID_ALARM);
-            errlogPrintf("Send Message to Snmp Operation Thread Error [%s]", pso->name);
+            errlogPrintf("write_so_snmp: epicsMessageQueueTrySend Error [%s]\n", pso->name);
             return -1;
         }
         else
@@ -749,7 +751,7 @@ static long read_wf_snmp(struct waveformRecord *pwf)
         if(epicsMessageQueueTrySend(pRequest->pSnmpAgent->msgQ_id, (void *)&pRequest, sizeof(SNMP_REQUEST *)) == -1)
         {
             recGblSetSevr(pwf, READ_ALARM, INVALID_ALARM);
-            errlogPrintf("Send Message to Snmp Operation Thread Error [%s]", pwf->name);
+            errlogPrintf("read_wf_snmp: epicsMessageQueueTrySend Error [%s]\n", pwf->name);
             rtn = -1;
         }
         else

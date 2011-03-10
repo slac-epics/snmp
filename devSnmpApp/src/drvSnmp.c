@@ -557,9 +557,13 @@ int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion,
 
     if (!snmpInited)
     {
+		printf( "init_snmp: ...\n" );
         init_snmp("epicsSnmp");
+
         /* add_mibdir("/usr/share/snmp/mibs"); */	/* Does not need */
+		printf( "reading mibs: ...\n" );
         read_all_mibs();
+
         init_mib();
 
         ellInit(&snmpAgentList);
