@@ -31,6 +31,11 @@ static long init_li_snmpV1(struct longinRecord *pli);
 static long init_li_snmpV2c(struct longinRecord *pli);
 static long read_li_snmp(struct longinRecord *pli);
 
+static long init_mbbi_snmp(struct mbbiRecord *pmbbi, long snmpVersion);
+static long init_mbbi_snmpV1(struct mbbiRecord *pmbbi);
+static long init_mbbi_snmpV2c(struct mbbiRecord *pmbbi);
+static long read_mbbi_snmp(struct mbbiRecord *pmbbi);
+
 static long init_lo_snmp(struct longoutRecord *plo, long snmpVersion);
 static long init_lo_snmpV1(struct longoutRecord *plo);
 static long init_lo_snmpV2c(struct longoutRecord *plo);
@@ -65,6 +70,7 @@ typedef struct {
 SNMP_DEV_SUP_SET devAiSnmpV1 = {6, NULL, NULL, init_ai_snmpV1,  NULL, read_ai_snmp, NULL};
 SNMP_DEV_SUP_SET devAoSnmpV1 = {6, NULL, NULL, init_ao_snmpV1,  NULL, write_ao_snmp, NULL};
 SNMP_DEV_SUP_SET devLiSnmpV1 = {6, NULL, NULL, init_li_snmpV1,  NULL, read_li_snmp, NULL};
+SNMP_DEV_SUP_SET devMbbiSnmpV1={6, NULL, NULL, init_mbbi_snmpV1,  NULL, read_mbbi_snmp, NULL};
 SNMP_DEV_SUP_SET devLoSnmpV1 = {6, NULL, NULL, init_lo_snmpV1,  NULL, write_lo_snmp, NULL};
 SNMP_DEV_SUP_SET devSiSnmpV1 = {6, NULL, NULL, init_si_snmpV1,  NULL, read_si_snmp, NULL};
 SNMP_DEV_SUP_SET devSoSnmpV1 = {6, NULL, NULL, init_so_snmpV1,  NULL, write_so_snmp, NULL};
@@ -73,6 +79,7 @@ SNMP_DEV_SUP_SET devWfSnmpV1 = {6, NULL, NULL, init_wf_snmpV1,  NULL, read_wf_sn
 SNMP_DEV_SUP_SET devAiSnmpV2c = {6, NULL, NULL, init_ai_snmpV2c,  NULL, read_ai_snmp, NULL};
 SNMP_DEV_SUP_SET devAoSnmpV2c = {6, NULL, NULL, init_ao_snmpV2c,  NULL, write_ao_snmp, NULL};
 SNMP_DEV_SUP_SET devLiSnmpV2c = {6, NULL, NULL, init_li_snmpV2c,  NULL, read_li_snmp, NULL};
+SNMP_DEV_SUP_SET devMbbiSnmpV2c={6, NULL, NULL, init_mbbi_snmpV2c,  NULL, read_mbbi_snmp, NULL};
 SNMP_DEV_SUP_SET devLoSnmpV2c = {6, NULL, NULL, init_lo_snmpV2c,  NULL, write_lo_snmp, NULL};
 SNMP_DEV_SUP_SET devSiSnmpV2c = {6, NULL, NULL, init_si_snmpV2c,  NULL, read_si_snmp, NULL};
 SNMP_DEV_SUP_SET devSoSnmpV2c = {6, NULL, NULL, init_so_snmpV2c,  NULL, write_so_snmp, NULL};
@@ -82,6 +89,7 @@ SNMP_DEV_SUP_SET devWfSnmpV2c = {6, NULL, NULL, init_wf_snmpV2c,  NULL, read_wf_
 epicsExportAddress(dset, devAiSnmpV1);
 epicsExportAddress(dset, devAoSnmpV1);
 epicsExportAddress(dset, devLiSnmpV1);
+epicsExportAddress(dset, devMbbiSnmpV1);
 epicsExportAddress(dset, devLoSnmpV1);
 epicsExportAddress(dset, devSiSnmpV1);
 epicsExportAddress(dset, devSoSnmpV1);
@@ -90,6 +98,7 @@ epicsExportAddress(dset, devWfSnmpV1);
 epicsExportAddress(dset, devAiSnmpV2c);
 epicsExportAddress(dset, devAoSnmpV2c);
 epicsExportAddress(dset, devLiSnmpV2c);
+epicsExportAddress(dset, devMbbiSnmpV2c);
 epicsExportAddress(dset, devLoSnmpV2c);
 epicsExportAddress(dset, devSiSnmpV2c);
 epicsExportAddress(dset, devSoSnmpV2c);
@@ -384,6 +393,110 @@ static long read_li_snmp(struct longinRecord *pli)
     return(rtn);
 }
 
+static long init_mbbi_snmp(struct mbbiRecord *pmbbi, long snmpVersion)
+{
+    int status = 0;
+
+    /* mbbi.inp must be INST_IO */
+    if(pmbbi->inp.type != INST_IO)
+    {
+        recGblRecordError(S_db_badField,(void *)pmbbi, "devMbbiSnmp (init_record) Illegal INP field");
+        pmbbi->pact = TRUE;
+        return(S_db_badField);
+    }
+
+    status = snmpRequestInit((dbCommon *)pmbbi, pmbbi->inp.value.instio.string, snmpVersion, MAX_CA_STRING_SIZE, 0, 'i');
+
+    if (status)
+    {
+        recGblRecordError(S_db_badField, (void *)pmbbi,"devMbbiSnmp (init_record) bad parameters");
+        pmbbi->pact = TRUE;
+        return(S_db_badField);
+    }
+
+    return(status);
+}
+
+static long init_mbbi_snmpV1(struct mbbiRecord *pmbbi)
+{
+    return init_mbbi_snmp(pmbbi, SNMP_VERSION_1);
+}
+
+static long init_mbbi_snmpV2c(struct mbbiRecord *pmbbi)
+{
+    return init_mbbi_snmp(pmbbi, SNMP_VERSION_2c);
+}
+
+static long read_mbbi_snmp(struct mbbiRecord *pmbbi)
+{
+    SNMP_REQUEST  *pRequest = (SNMP_REQUEST *)(pmbbi->dpvt);
+    int rtn = -1;
+    char *pValStr;
+    unsigned int u32temp;
+
+    if(!pRequest) return(-1);
+
+    if(!pmbbi->pact)
+    {	/* pre-process */
+        /* Clean up the request */
+        pRequest->errCode = SNMP_REQUEST_NO_ERR;
+        pRequest->opDone = 0;
+
+        if(epicsMessageQueueTrySend(pRequest->pSnmpAgent->msgQ_id, (void *)&pRequest, sizeof(SNMP_REQUEST *)) == -1)
+        {
+            recGblSetSevr(pmbbi, READ_ALARM, INVALID_ALARM);
+            errlogPrintf("read_mbbi_snmp: epicsMessageQueueTrySend Error on [%s]\n", pmbbi->name);
+            rtn = -1;
+        }
+        else
+        {
+            pmbbi->pact = TRUE;
+            rtn = 0;
+        }
+    }	/* pre-process */
+
+    else
+
+    {	/* post-process */
+        if( (!pRequest->opDone) || pRequest->errCode )
+        {
+            recGblSetSevr(pmbbi, READ_ALARM, INVALID_ALARM);
+            errlogPrintf("Record [%s] receive error code [0x%08x]!\n", pmbbi->name, pRequest->errCode);
+            rtn = -1;
+        }
+        else
+        {
+            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] receives string [%s]!\n", pmbbi->name, pRequest->pValStr);
+
+            pValStr = strrchr(pRequest->pValStr, ':');
+            if ( pValStr == NULL )
+				pValStr = pRequest->pValStr;
+            else
+				pValStr++;
+
+            /* skip non-digit, particularly because of WIENER crate has ON(1), OFF(0) */
+            for (; isdigit(*pValStr) == 0 && *pValStr != '\0'; )
+				++pValStr;
+
+            /* The mbbi record for snmp only handles unsigned int */
+            if ( pValStr && sscanf( pValStr, "%u", &u32temp ) )
+            {
+                pmbbi->rval	= u32temp & 0x7FFFFFFF;	/* Get rid of MSB since pmbbi->val is signed */
+                /* pmbbi->udf	= FALSE; */
+				rtn = 0;
+			}
+            else
+            {
+                recGblSetSevr(pmbbi, READ_ALARM, INVALID_ALARM);
+                errlogPrintf("Record [%s] parsing response [%s] error!\n", pmbbi->name, pValStr);
+				rtn = -1;
+			}
+        }
+    }	/* post-process */
+
+    return(rtn);
+}
+
 static long init_lo_snmp(struct longoutRecord *plo, long snmpVersion)
 {
     int status = 0;
@@ -418,10 +531,10 @@ static long init_lo_snmp(struct longoutRecord *plo, long snmpVersion)
 
         /* skip non-digit, particularly because of WIENER crate has ON(1), OFF(0) */
         for (; isdigit(*pValStr) == 0 && *pValStr != '\0'; ) ++pValStr;
-        /* The longin record for snmp only handles unsigned int */
+        /* The longout record for snmp only handles unsigned int */
         if (pValStr && sscanf(pValStr, "%u", &u32temp))
         {
-            plo->val = u32temp&0x7FFFFFFF;	/* Get rid of MSB since pli->val is signed */
+            plo->val = u32temp&0x7FFFFFFF;	/* Get rid of MSB since plo->val is signed */
             plo->udf = FALSE;
             plo->stat=plo->sevr=NO_ALARM;
         }

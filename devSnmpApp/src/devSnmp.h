@@ -49,6 +49,7 @@
 
 #include <aiRecord.h>
 #include <aoRecord.h>
+#include <mbbiRecord.h>
 #include <stringinRecord.h>
 #include <stringoutRecord.h>
 #include <longinRecord.h>
