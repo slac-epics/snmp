@@ -265,7 +265,7 @@ static long write_ao_snmp(struct aoRecord *pao)
         pRequest->errCode = SNMP_REQUEST_NO_ERR;
         pRequest->opDone = 0;
         /* Give the value */
-        /* sprintf(pRequest->pValStr, "%*.8lf", MAX_CA_STRING_SIZE-1, pao->val); */
+        /* snprintf(pRequest->pValStr, MAX_CA_STRING_SIZE-1, "%lf", pao->val); */
         sprintf(pRequest->pValStr, "%lf", pao->val);
 
         if(epicsMessageQueueTrySend(pRequest->pSnmpAgent->msgQ_id, (void *)&pRequest, sizeof(SNMP_REQUEST *)) == -1)

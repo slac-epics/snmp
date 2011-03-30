@@ -93,6 +93,7 @@ int write_mib_tree( const char * pszFileName )
 	}
 
 	print_mib( pFile );
+	print_oid_report( pFile );
 	fclose( pFile );
 	return 0;
 }

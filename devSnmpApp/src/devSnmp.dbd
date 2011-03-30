@@ -32,3 +32,6 @@ device(	stringout,	INST_IO,	devSoSnmpV2c,	"Snmp"	)
 
 driver(	drvSnmp	)
 
+variable( SNMP_DRV_DEBUG,	 int )
+variable( snmpMaxVarsPerMsg, int )
+

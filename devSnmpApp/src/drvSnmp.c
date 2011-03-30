@@ -12,12 +12,16 @@
 \***************************************************************************/
 
 #include "devSnmp.h"
+#include "epicsExport.h"
 
 ELLLIST snmpAgentList = {{NULL, NULL}, 0};
 epicsMutexId snmpAgentListLock;
 
 int SNMP_DRV_DEBUG = 0;
-int snmpMaxVarsPerMsg = 30;	/* Max number of variables per request message */
+int snmpMaxVarsPerMsg = 60;	/* Max number of variables per request message */
+
+epicsExportAddress( int, SNMP_DRV_DEBUG );
+epicsExportAddress( int, snmpMaxVarsPerMsg );
 
 /*********************************************************************/
 static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
@@ -51,484 +55,512 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
         {/* we should never time out, so something wrong */
             errlogPrintf("Operation %s msgQ timeout!\n", pSnmpAgent->pActiveSession->peername);
             epicsThreadSleep(2.0);  /* Avoid super loop to starve CPU */
+			continue;
         }
-        else
-        {/* some requests come in */
-            if(SNMP_DRV_DEBUG > 1) printf("Oper task for agent[%s] gets requests!\n", pSnmpAgent->pActiveSession->peername);
+ 
+        /* some requests come in */
+		if(SNMP_DRV_DEBUG > 1) printf("Oper task for agent[%s] gets requests!\n", pSnmpAgent->pActiveSession->peername);
 
-            /* Figure out how many requests in queue */
-            NofReqs = epicsMessageQueuePending(pSnmpAgent->msgQ_id);
+		/* Figure out how many requests in queue */
+		NofReqs = epicsMessageQueuePending(pSnmpAgent->msgQ_id);
 
-            /* Deal up to max number of variables per request, don't forget we already got one request */
-            /* Since we will do both query and commmand, NofReqs + 1 is the total of both */
-            NofReqs = MIN( (NofReqs + 1), (MAX(1, snmpMaxVarsPerMsg)) ) - 1;
+		/* Deal up to max number of variables per request, don't forget we already got one request */
+		/* Since we will do both query and commmand, NofReqs + 1 is the total of both */
+		NofReqs = MIN( (NofReqs + 1), (MAX(1, snmpMaxVarsPerMsg)) ) - 1;
 
-            /* We just re-init link list instead of delete, because there is no resource issue */
-            ellInit( &requestQryList );
-            ellInit( &requestCmdList );
-            /* create a PDU for this request */
-            pSnmpAgent->reqQryPdu = snmp_pdu_create(SNMP_MSG_GET);
-            pSnmpAgent->reqCmdPdu = snmp_pdu_create(SNMP_MSG_SET);
+		/* We just re-init link list instead of delete, because there is no resource issue */
+		ellInit( &requestQryList );
+		ellInit( &requestCmdList );
 
-            for(loop=0; loop<=NofReqs; loop++)
-            {/* Read out requests. We loop one more time, because we already read out one pRequest */
-                if(loop != 0) epicsMessageQueueReceive(pSnmpAgent->msgQ_id, &pRequest, sizeof(SNMP_REQUEST *));
+		/* Create an SNMP Protocol Data Unit (PDU) for this request */
+		pSnmpAgent->reqQryPdu = snmp_pdu_create(SNMP_MSG_GET);
+		pSnmpAgent->reqCmdPdu = snmp_pdu_create(SNMP_MSG_SET);
 
-                if(pRequest->cmd != 0 && pSnmpAgent->reqCmdPdu != NULL)
-                {/* Command request */
-                    /* Add each request into the pdu */
-                    if(snmp_add_var(pSnmpAgent->reqCmdPdu, pRequest->objectId.requestOid, pRequest->objectId.requestOidLen, pRequest->type, pRequest->pValStr))
-                    {/* failed to add var */
-                        pRequest->errCode = SNMP_REQUEST_ADDVAR_ERR;
-                        pRequest->opDone = 1;
-                        if(pRequest->pRecord)
-                        {
-                            dbScanLock(pRequest->pRecord);
-                            (*(pRequest->pRecord->rset->process))(pRequest->pRecord);
-                            dbScanUnlock(pRequest->pRecord);
-                        }
-                        snmp_perror(pRequest->objectId.requestName);
-                        errlogPrintf("snmp_add_var %s, type %c, value %s\n", pRequest->objectId.requestName, pRequest->type, pRequest->pValStr);
-                    }
-                    else
-                    {/* succeed to add var */
-                        pRequest->errCode = SNMP_REQUEST_NO_ERR;  /* clean up err_code before we execute it */
-                        pRequest->opDone = 0;   /* We didn't start yet, of cause not done */
-                        /* place each request into the link list */
-                        ellAdd( (ELLLIST *) &requestCmdList, (ELLNODE *) pRequest );
-                    }
-                }
-                else if(pRequest->cmd == 0 && pSnmpAgent->reqQryPdu != NULL)
-                {/* Query request */
-                    /* Add each request into the pdu */
-                    if(NULL == snmp_add_null_var(pSnmpAgent->reqQryPdu, pRequest->objectId.requestOid, pRequest->objectId.requestOidLen))
-                    {/* failed to add var */
-                        pRequest->errCode = SNMP_REQUEST_ADDVAR_ERR;
-                        pRequest->opDone = 1;
-                        if(pRequest->pRecord)
-                        {
-                            dbScanLock(pRequest->pRecord);
-                            (*(pRequest->pRecord->rset->process))(pRequest->pRecord);
-                            dbScanUnlock(pRequest->pRecord);
-                        }
-                        snmp_perror(pRequest->objectId.requestName);
-                        errlogPrintf("snmp_add_null_var %s\n", pRequest->objectId.requestName);
-                    }
-                    else
-                    {/* succeed to add var */
-                        pRequest->errCode = SNMP_REQUEST_NO_ERR;  /* clean up err_code before we execute it */
-                        pRequest->opDone = 0;   /* We didn't start yet, of cause not done */
-                        /* place each request into the link list */
-                        ellAdd( (ELLLIST *) &requestQryList, (ELLNODE *) pRequest );
-                    }
-                }
-                else
-                {/* Failed to create request PDU */
-                    pRequest->errCode = SNMP_REQUEST_PDU_ERR;
-                    pRequest->opDone = 1;
-                    if(pRequest->pRecord)
-                    {
-                        dbScanLock(pRequest->pRecord);
-                        (*(pRequest->pRecord->rset->process))(pRequest->pRecord);
-                        dbScanUnlock(pRequest->pRecord);
-                    }
-                }
-            }
+		for(loop=0; loop<=NofReqs; loop++)
+		{
+			/*
+			 * Read out requests.
+			 * We loop one more time, because we already read out one pRequest
+			 */
+			if(loop != 0)
+				epicsMessageQueueReceive(pSnmpAgent->msgQ_id, &pRequest, sizeof(SNMP_REQUEST *));
 
-            if(requestCmdList.count)
-            {/* Send out all commands */
-                /* send command to the snmp agent */
-                status = snmp_sess_synch_response(pSnmpAgent->pSess, pSnmpAgent->reqCmdPdu, &respCmdPdu);
-                switch(status)
-                {
-                    case STAT_SUCCESS:
-                        pVar = respCmdPdu->variables;
-                        if (respCmdPdu->errstat == SNMP_ERR_NOERROR)
-                        {/* Successfully got response, and no error in the response */
-                            while (pVar != NULL)
-                            {
-                                for(pRequest = (SNMP_REQUEST *)ellFirst(&requestCmdList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
-                                {/* Looking for request with matched Oid */
-                                    if(!memcmp(pVar->name, pRequest->objectId.requestOid, pRequest->objectId.requestOidLen * sizeof(oid))) break;
-                                }
+			if(pRequest->cmd != 0 && pSnmpAgent->reqCmdPdu != NULL)
+			{/* Command request */
 
-                                if(pRequest)
-                                {/* Found the matched request */
-                                    /* snprint_value converts the value into a text string. If the buffer is not big enough, it might return -1 and only  */
-                                    /* put data type in. So we use a large temp buffer here.                                                              */
-                                    int cvtSts;
-                                    cvtSts = snprint_value(pBuf, sizeof(pBuf), pVar->name, pVar->name_length, pVar);
-                                    if(cvtSts <= 0)
-                                    {
-                                        errlogPrintf("Conversion failed for record [%s]\n", pRequest->pRecord->name);
-                                        pRequest->errCode = SNMP_REQUEST_CVT_ERR;	/* Conversion failure */
-                                    }
-                                    else
-                                    {
-                                        strncpy(pRequest->pValStr, pBuf, pRequest->valStrLen - 1);
-                                        pRequest->pValStr[pRequest->valStrLen - 1] = '\0';
-                                        pRequest->errCode = SNMP_REQUEST_NO_ERR;
-                                    }
-                                    pRequest->opDone = 1;
+				/* Add each request into the pdu */
+				if ( snmp_add_var(	pSnmpAgent->reqCmdPdu,
+									pRequest->objectId.requestOid,
+									pRequest->objectId.requestOidLen,
+									pRequest->type, pRequest->pValStr ) )
+				{/* failed to add var */
+					pRequest->errCode = SNMP_REQUEST_ADDVAR_ERR;
+					pRequest->opDone = 1;
+					if(pRequest->pRecord)
+					{
+						dbScanLock(pRequest->pRecord);
+						(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
+						dbScanUnlock(pRequest->pRecord);
+					}
+					snmp_perror(pRequest->objectId.requestName);
+					errlogPrintf("snmp_add_var %s, type %c, value %s\n", pRequest->objectId.requestName, pRequest->type, pRequest->pValStr);
+				}
+				else
+				{/* succeed to add var */
+					pRequest->errCode = SNMP_REQUEST_NO_ERR;  /* clean up err_code before we execute it */
+					pRequest->opDone = 0;   /* We didn't start yet, of cause not done */
+					/* place each request into the link list */
+					ellAdd( (ELLLIST *) &requestCmdList, (ELLNODE *) pRequest );
+				}
+			}
+			else if(pRequest->cmd == 0 && pSnmpAgent->reqQryPdu != NULL)
+			{/* Query request */
+				/* Add each request into the pdu */
+				if ( NULL == snmp_add_null_var(	pSnmpAgent->reqQryPdu,
+												pRequest->objectId.requestOid,
+												pRequest->objectId.requestOidLen ) )
+				{/* failed to add var */
+					pRequest->errCode = SNMP_REQUEST_ADDVAR_ERR;
+					pRequest->opDone = 1;
+					if(pRequest->pRecord)
+					{
+						dbScanLock(pRequest->pRecord);
+						(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
+						dbScanUnlock(pRequest->pRecord);
+					}
+					snmp_perror(pRequest->objectId.requestName);
+					errlogPrintf("snmp_add_null_var %s\n", pRequest->objectId.requestName);
+				}
+				else
+				{/* succeed to add var */
+					pRequest->errCode = SNMP_REQUEST_NO_ERR;  /* clean up err_code before we execute it */
+					pRequest->opDone = 0;   /* We didn't start yet, of cause not done */
+					/* place each request into the link list */
+					ellAdd( (ELLLIST *) &requestQryList, (ELLNODE *) pRequest );
+				}
+			}
+			else
+			{/* Failed to create request PDU */
+				pRequest->errCode = SNMP_REQUEST_PDU_ERR;
+				pRequest->opDone = 1;
+				if(pRequest->pRecord)
+				{
+					dbScanLock(pRequest->pRecord);
+					(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
+					dbScanUnlock(pRequest->pRecord);
+				}
+			}
+		}
 
-                                    /* process record */
-                                    if(pRequest->pRecord)
-                                    {
-                                        if(SNMP_DRV_DEBUG > 1) printf("Got response for record [%s]=[%s]\n", pRequest->pRecord->name, pRequest->pValStr);
-                                        dbScanLock(pRequest->pRecord);
-                                        (*(pRequest->pRecord->rset->process))(pRequest->pRecord);
-                                        dbScanUnlock(pRequest->pRecord);
-                                        if(SNMP_DRV_DEBUG > 1) printf("Record [%s] processed\n", pRequest->pRecord->name);
-                                    }
+		/*
+		 * First handle all requests in the command list
+		 */
+		if(requestCmdList.count)
+		{/* Send out all commands */
+			/* send command to the snmp agent */
+			status = snmp_sess_synch_response(pSnmpAgent->pSess, pSnmpAgent->reqCmdPdu, &respCmdPdu);
+			switch(status)
+			{
+				case STAT_SUCCESS:
+					pVar = respCmdPdu->variables;
+					if (respCmdPdu->errstat == SNMP_ERR_NOERROR)
+					{/* Successfully got response, and no error in the response */
+						while (pVar != NULL)
+						{
+							for (	pRequest = (SNMP_REQUEST *)ellFirst(&requestCmdList);
+									pRequest;
+									pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ) )
+							{	/* Looking for request with matched Oid */
+								if ( !memcmp(	pVar->name,	pRequest->objectId.requestOid,
+												pRequest->objectId.requestOidLen * sizeof(oid) ) )
+									break;
+							}
 
-                                    /* Remove the request from link list */
-                                    epicsMutexLock(pSnmpAgent->mutexLock); 
-                                    ellDelete(&requestCmdList, (ELLNODE *) pRequest);
-                                    epicsMutexUnlock(pSnmpAgent->mutexLock); 
-                                }
-                                else
-                                {
-                                    snprint_objid(pBuf, sizeof(pBuf), pVar->name, pVar->name_length);
-                                    errlogPrintf("Get response for %s, but no matched request!\n", pBuf);
-                                }
+							if(pRequest)
+							{
+								/*
+								 *	Found the matched request
+								 *	snprint_value converts the value into a text string.
+								 *	If the buffer is not big enough, it might return -1
+								 *	and only put data type in.
+								 *	So we use a large temp buffer here.
+								 */
+								int cvtSts;
+								cvtSts = snprint_value(pBuf, sizeof(pBuf), pVar->name, pVar->name_length, pVar);
+								if(cvtSts <= 0)
+								{
+									errlogPrintf("Conversion failed for record [%s]\n", pRequest->pRecord->name);
+									pRequest->errCode = SNMP_REQUEST_CVT_ERR;	/* Conversion failure */
+								}
+								else
+								{
+									strncpy(pRequest->pValStr, pBuf, pRequest->valStrLen - 1);
+									pRequest->pValStr[pRequest->valStrLen - 1] = '\0';
+									pRequest->errCode = SNMP_REQUEST_NO_ERR;
+								}
+								pRequest->opDone = 1;
 
-                                pVar = pVar->next_variable;
-                            }
-                        }
-                        else
-                        {/* Successfully got response, and with error in the response, error is defined by errstat and errindex */
-                            for (varIndex = 1; pVar && varIndex != respCmdPdu->errindex; pVar = pVar->next_variable, varIndex++)
-                            {
-                                for(pRequest = (SNMP_REQUEST *)ellFirst(&requestCmdList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
-                                {/* Looking for request with matched Oid */
-                                    if(!memcmp(pVar->name, pRequest->objectId.requestOid, pRequest->objectId.requestOidLen * sizeof(oid))) break;
-                                }
+								/* process record */
+								if(pRequest->pRecord)
+								{
+									if(SNMP_DRV_DEBUG > 1) printf("Got response for record [%s]=[%s]\n", pRequest->pRecord->name, pRequest->pValStr);
+									dbScanLock(pRequest->pRecord);
+									(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
+									dbScanUnlock(pRequest->pRecord);
+									if(SNMP_DRV_DEBUG > 1) printf("Record [%s] processed\n", pRequest->pRecord->name);
+								}
 
-                                if(pRequest)
-                                {/* Found the matched request */
-                                    /* snprint_value converts the value into a text string. If the buffer is not big enough, it might return -1 and only  */
-                                    /* put data type in. So we use a large temp buffer here.                                                              */
-                                    int cvtSts;
-                                    cvtSts = snprint_value(pBuf, sizeof(pBuf), pVar->name, pVar->name_length, pVar);
-                                    if(cvtSts <= 0)
-                                    {
-                                        errlogPrintf("Conversion failed for record [%s]\n", pRequest->pRecord->name);
-                                        pRequest->errCode = SNMP_REQUEST_CVT_ERR;	/* Conversion failure */
-                                    }
-                                    else
-                                    {
-                                        strncpy(pRequest->pValStr, pBuf, pRequest->valStrLen - 1);
-                                        pRequest->pValStr[pRequest->valStrLen - 1] = '\0';
-                                        pRequest->errCode = SNMP_REQUEST_NO_ERR;
-                                    }
-                                    pRequest->opDone = 1;
+								/* Remove the request from link list */
+								epicsMutexLock(pSnmpAgent->mutexLock); 
+								ellDelete(&requestCmdList, (ELLNODE *) pRequest);
+								epicsMutexUnlock(pSnmpAgent->mutexLock); 
+							}
+							else
+							{
+								snprint_objid(pBuf, sizeof(pBuf), pVar->name, pVar->name_length);
+								errlogPrintf("Get response for %s, but no matched request!\n", pBuf);
+							}
 
-                                    /* process record */
-                                    if(pRequest->pRecord)
-                                    {
-                                        dbScanLock(pRequest->pRecord);
-                                        (*(pRequest->pRecord->rset->process))(pRequest->pRecord);
-                                        dbScanUnlock(pRequest->pRecord);
-                                    }
+							pVar = pVar->next_variable;
+						}
+					}
+					else
+					{/* Successfully got response, and with error in the response, error is defined by errstat and errindex */
+						for (varIndex = 1; pVar && varIndex != respCmdPdu->errindex; pVar = pVar->next_variable, varIndex++)
+						{
+							for(pRequest = (SNMP_REQUEST *)ellFirst(&requestCmdList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
+							{/* Looking for request with matched Oid */
+								if(!memcmp(pVar->name, pRequest->objectId.requestOid, pRequest->objectId.requestOidLen * sizeof(oid))) break;
+							}
 
-                                    /* Remove the request from link list */
-                                    epicsMutexLock(pSnmpAgent->mutexLock);
-                                    ellDelete(&requestCmdList, (ELLNODE *) pRequest);
-                                    epicsMutexUnlock(pSnmpAgent->mutexLock);
-                                }
-                                else
-                                {
-                                    snprint_objid(pBuf, sizeof(pBuf), pVar->name, pVar->name_length);
-                                    errlogPrintf("Get response for %s, but no matched request!\n", pBuf);
-                                }
-                            }
+							if(pRequest)
+							{/* Found the matched request */
+								/* snprint_value converts the value into a text string. If the buffer is not big enough, it might return -1 and only  */
+								/* put data type in. So we use a large temp buffer here.                                                              */
+								int cvtSts;
+								cvtSts = snprint_value(pBuf, sizeof(pBuf), pVar->name, pVar->name_length, pVar);
+								if(cvtSts <= 0)
+								{
+									errlogPrintf("Conversion failed for record [%s]\n", pRequest->pRecord->name);
+									pRequest->errCode = SNMP_REQUEST_CVT_ERR;	/* Conversion failure */
+								}
+								else
+								{
+									strncpy(pRequest->pValStr, pBuf, pRequest->valStrLen - 1);
+									pRequest->pValStr[pRequest->valStrLen - 1] = '\0';
+									pRequest->errCode = SNMP_REQUEST_NO_ERR;
+								}
+								pRequest->opDone = 1;
 
-                            if(pVar)
-                                snprint_objid(pBuf, sizeof(pBuf), pVar->name, pVar->name_length);
-                            else
-                                strcpy(pBuf, "(none)");
+								/* process record */
+								if(pRequest->pRecord)
+								{
+									dbScanLock(pRequest->pRecord);
+									(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
+									dbScanUnlock(pRequest->pRecord);
+								}
 
-                            sprintf(pErrBuf, "\nrequestCmdList: snmp_sess_synch_response: errindex %ld\n\t%s %s %s\n",
-                                respCmdPdu->errindex, pSnmpAgent->pActiveSession->peername, pRequest->objectId.requestName, pBuf);
-                            errlogPrintf("%s", pErrBuf);
-                            snmp_sess_perror(pErrBuf, pSnmpAgent->pActiveSession);
-                        }
+								/* Remove the request from link list */
+								epicsMutexLock(pSnmpAgent->mutexLock);
+								ellDelete(&requestCmdList, (ELLNODE *) pRequest);
+								epicsMutexUnlock(pSnmpAgent->mutexLock);
+							}
+							else
+							{
+								snprint_objid(pBuf, sizeof(pBuf), pVar->name, pVar->name_length);
+								errlogPrintf("Get response for %s, but no matched request!\n", pBuf);
+							}
+						}
 
-                        /* If still some queries in link list and can't find variables to match */
-                        for(pRequest = (SNMP_REQUEST *)ellFirst(&requestCmdList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
-                        {/* Go thru the request list to process all records */
+						if(pVar)
+							snprint_objid(pBuf, sizeof(pBuf), pVar->name, pVar->name_length);
+						else
+							strcpy(pBuf, "(none)");
 
-                             pRequest->errCode = SNMP_REQUEST_CMD_NOANS; /* snmp request no answer in response */
-                             pRequest->opDone = 1;
+						sprintf(pErrBuf, "\nrequestCmdList: snmp_sess_synch_response: errindex %ld\n\t%s %s %s\n",
+							respCmdPdu->errindex, pSnmpAgent->pActiveSession->peername, pRequest->objectId.requestName, pBuf);
+						errlogPrintf("%s", pErrBuf);
+						snmp_sess_perror(pErrBuf, pSnmpAgent->pActiveSession);
+					}
 
-                            /* process record */
-                            if(pRequest->pRecord)
-                            {
-                                dbScanLock(pRequest->pRecord);
-                                (*(pRequest->pRecord->rset->process))(pRequest->pRecord);
-                                dbScanUnlock(pRequest->pRecord);
-                            }
-                            errlogPrintf("%s: Response doesn't have a match!\n", pRequest->pRecord->name);
-                        }
+					/* If still some queries in link list and can't find variables to match */
+					for(pRequest = (SNMP_REQUEST *)ellFirst(&requestCmdList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
+					{/* Go thru the request list to process all records */
 
-                        break;
-                    case STAT_TIMEOUT:
-                        for(pRequest = (SNMP_REQUEST *)ellFirst(&requestCmdList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
-                        {/* Go thru the request list to process all records */
+						 pRequest->errCode = SNMP_REQUEST_CMD_NOANS; /* snmp request no answer in response */
+						 pRequest->opDone = 1;
 
-                             pRequest->errCode = SNMP_REQUEST_CMD_TOUT; /* snmp command timeout */
-                             pRequest->opDone = 1;
+						/* process record */
+						if(pRequest->pRecord)
+						{
+							dbScanLock(pRequest->pRecord);
+							(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
+							dbScanUnlock(pRequest->pRecord);
+						}
+						errlogPrintf("%s: Response doesn't have a match!\n", pRequest->pRecord->name);
+					}
 
-                            /* process record */
-                            if(pRequest->pRecord)
-                            {
-                                dbScanLock(pRequest->pRecord);
-                                (*(pRequest->pRecord->rset->process))(pRequest->pRecord);
-                                dbScanUnlock(pRequest->pRecord);
-                            }
-                        }
+					break;
+				case STAT_TIMEOUT:
+					for(pRequest = (SNMP_REQUEST *)ellFirst(&requestCmdList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
+					{/* Go thru the request list to process all records */
 
-                        errlogPrintf("%s: Snmp Query Timeout\n", pSnmpAgent->pActiveSession->peername);
-                        break;
-                    case STAT_ERROR:
-                    default:
-                    {
-                        int liberr, syserr;
-                        char * errstr;
-                        snmp_sess_perror(pSnmpAgent->pActiveSession->peername, pSnmpAgent->pActiveSession);
-                        snmp_sess_error(pSnmpAgent->pSess, &liberr, &syserr, &errstr);
+						 pRequest->errCode = SNMP_REQUEST_CMD_TOUT; /* snmp command timeout */
+						 pRequest->opDone = 1;
 
-                        for(pRequest = (SNMP_REQUEST *)ellFirst(&requestCmdList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
-                        {/* Go thru the request list to process all records */
+						/* process record */
+						if(pRequest->pRecord)
+						{
+							dbScanLock(pRequest->pRecord);
+							(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
+							dbScanUnlock(pRequest->pRecord);
+						}
+					}
 
-                             pRequest->errCode = SNMP_REQUEST_SNMP_ERR |(liberr?liberr:syserr); /* snmp error */
-                             pRequest->opDone = 1;
+					errlogPrintf("%s: Snmp Query Timeout\n", pSnmpAgent->pActiveSession->peername);
+					break;
+				case STAT_ERROR:
+				default:
+				{
+					int liberr, syserr;
+					char * errstr;
+					snmp_sess_perror(pSnmpAgent->pActiveSession->peername, pSnmpAgent->pActiveSession);
+					snmp_sess_error(pSnmpAgent->pSess, &liberr, &syserr, &errstr);
 
-                            /* process record */
-                            if(pRequest->pRecord)
-                            {
-                                dbScanLock(pRequest->pRecord);
-                                (*(pRequest->pRecord->rset->process))(pRequest->pRecord);
-                                dbScanUnlock(pRequest->pRecord);
-                            }
-                        }
+					for(pRequest = (SNMP_REQUEST *)ellFirst(&requestCmdList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
+					{/* Go thru the request list to process all records */
 
-                        errlogPrintf("Query %s error %s!\n", pSnmpAgent->pActiveSession->peername, errstr);
-                        free(errstr);
-                    }
-                        break;
-                }
+						 pRequest->errCode = SNMP_REQUEST_SNMP_ERR |(liberr?liberr:syserr); /* snmp error */
+						 pRequest->opDone = 1;
 
-                /* Free the response PDU for this request. */
-                /*If error happened before, the reqCmdPdu is already freed by snmp_sess_synch_response, the respCmdPdu is NULL */
-                /* If no error happened, respCmdPdu is cloned from reqCmdPdu and reqCmdPdu is freed */
-                if(respCmdPdu)
-                {
-                    snmp_free_pdu(respCmdPdu);
-                    respCmdPdu = NULL;
-                    if(SNMP_DRV_DEBUG > 1) printf("Oper task for agent[%s] frees PDU!\n", pSnmpAgent->pActiveSession->peername);
-                }
+						/* process record */
+						if(pRequest->pRecord)
+						{
+							dbScanLock(pRequest->pRecord);
+							(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
+							dbScanUnlock(pRequest->pRecord);
+						}
+					}
 
-            }/* Command PDU */
+					errlogPrintf("Query %s error %s!\n", pSnmpAgent->pActiveSession->peername, errstr);
+					free(errstr);
+				}
+					break;
+			}
 
-            if(requestQryList.count)
-            {/* Read out and re-organize all requests */
-                /* request the snmp agent */
-                status = snmp_sess_synch_response(pSnmpAgent->pSess, pSnmpAgent->reqQryPdu, &respQryPdu);
-                switch(status)
-                {
-                    case STAT_SUCCESS:
-                        pVar = respQryPdu->variables;
-                        if (respQryPdu->errstat == SNMP_ERR_NOERROR)
-                        {/* Successfully got response, and no error in the response */
-                            while (pVar != NULL)
-                            {
-                                for(pRequest = (SNMP_REQUEST *)ellFirst(&requestQryList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
-                                {/* Looking for request with matched Oid */
-                                    if(!memcmp(pVar->name, pRequest->objectId.requestOid, pRequest->objectId.requestOidLen * sizeof(oid))) break;
-                                }
+			/* Free the response PDU for this request. */
+			/*If error happened before, the reqCmdPdu is already freed by snmp_sess_synch_response, the respCmdPdu is NULL */
+			/* If no error happened, respCmdPdu is cloned from reqCmdPdu and reqCmdPdu is freed */
+			if(respCmdPdu)
+			{
+				snmp_free_pdu(respCmdPdu);
+				respCmdPdu = NULL;
+				if(SNMP_DRV_DEBUG > 1) printf("Oper task for agent[%s] frees PDU!\n", pSnmpAgent->pActiveSession->peername);
+			}
 
-                                if(pRequest)
-                                {/* Found the matched request */
-                                    /* snprint_value converts the value into a text string. If the buffer is not big enough, it might return -1 and only  */
-                                    /* put data type in. So we use a large temp buffer here.                                                              */
-                                    int cvtSts;
-                                    cvtSts = snprint_value(pBuf, sizeof(pBuf), pVar->name, pVar->name_length, pVar);
-                                    if(cvtSts <= 0)
-                                    {
-                                        errlogPrintf("Conversion failed for record [%s]\n", pRequest->pRecord->name);
-                                        pRequest->errCode = SNMP_REQUEST_CVT_ERR;	/* Conversion failure */
-                                    }
-                                    else
-                                    {
-                                        strncpy(pRequest->pValStr, pBuf, pRequest->valStrLen - 1);
-                                        pRequest->pValStr[pRequest->valStrLen - 1] = '\0';
-                                        pRequest->errCode = SNMP_REQUEST_NO_ERR;
-                                    }
-                                    pRequest->opDone = 1;
+		}/* Command PDU */
 
-                                    /* process record */
-                                    if(pRequest->pRecord)
-                                    {
-                                        if(SNMP_DRV_DEBUG > 1) printf("Got response for record [%s]=[%s]\n", pRequest->pRecord->name, pRequest->pValStr);
-                                        dbScanLock(pRequest->pRecord);
-                                        (*(pRequest->pRecord->rset->process))(pRequest->pRecord);
-                                        dbScanUnlock(pRequest->pRecord);
-                                        if(SNMP_DRV_DEBUG > 1) printf("Record [%s] processed\n", pRequest->pRecord->name);
-                                    }
+		/*
+		 * Next handle all requests in the query list
+		 */
+		if(requestQryList.count)
+		{/* Read out and re-organize all requests */
+			/* request the snmp agent */
+			status = snmp_sess_synch_response(pSnmpAgent->pSess, pSnmpAgent->reqQryPdu, &respQryPdu);
+			switch(status)
+			{
+				case STAT_SUCCESS:
+					pVar = respQryPdu->variables;
+					if (respQryPdu->errstat == SNMP_ERR_NOERROR)
+					{/* Successfully got response, and no error in the response */
+						while (pVar != NULL)
+						{
+							for(pRequest = (SNMP_REQUEST *)ellFirst(&requestQryList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
+							{/* Looking for request with matched Oid */
+								if(!memcmp(pVar->name, pRequest->objectId.requestOid, pRequest->objectId.requestOidLen * sizeof(oid))) break;
+							}
 
-                                    /* Remove the request from link list */
-                                    epicsMutexLock(pSnmpAgent->mutexLock); 
-                                    ellDelete(&requestQryList, (ELLNODE *) pRequest);
-                                    epicsMutexUnlock(pSnmpAgent->mutexLock); 
-                                }
-                                else
-                                {
-                                    snprint_objid(pBuf, sizeof(pBuf), pVar->name, pVar->name_length);
-                                    errlogPrintf("Get response for %s, but no matched request!\n", pBuf);
-                                }
+							if(pRequest)
+							{/* Found the matched request */
+								/* snprint_value converts the value into a text string. If the buffer is not big enough, it might return -1 and only  */
+								/* put data type in. So we use a large temp buffer here.                                                              */
+								int cvtSts;
+								cvtSts = snprint_value(pBuf, sizeof(pBuf), pVar->name, pVar->name_length, pVar);
+								if(cvtSts <= 0)
+								{
+									errlogPrintf("Conversion failed for record [%s]\n", pRequest->pRecord->name);
+									pRequest->errCode = SNMP_REQUEST_CVT_ERR;	/* Conversion failure */
+								}
+								else
+								{
+									strncpy(pRequest->pValStr, pBuf, pRequest->valStrLen - 1);
+									pRequest->pValStr[pRequest->valStrLen - 1] = '\0';
+									pRequest->errCode = SNMP_REQUEST_NO_ERR;
+								}
+								pRequest->opDone = 1;
 
-                                pVar = pVar->next_variable;
-                            }
-                        }
-                        else
-                        {/* Successfully got response, and with error in the response, error is defined by errstat and errindex */
-                            for (varIndex = 1; pVar && varIndex != respQryPdu->errindex; pVar = pVar->next_variable, varIndex++)
-                            {
-                                for(pRequest = (SNMP_REQUEST *)ellFirst(&requestQryList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
-                                {/* Looking for request with matched Oid */
-                                    if(!memcmp(pVar->name, pRequest->objectId.requestOid, pRequest->objectId.requestOidLen * sizeof(oid))) break;
-                                }
+								/* process record */
+								if(pRequest->pRecord)
+								{
+									if(SNMP_DRV_DEBUG > 1) printf("Got response for record [%s]=[%s]\n", pRequest->pRecord->name, pRequest->pValStr);
+									dbScanLock(pRequest->pRecord);
+									(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
+									dbScanUnlock(pRequest->pRecord);
+									if(SNMP_DRV_DEBUG > 1) printf("Record [%s] processed\n", pRequest->pRecord->name);
+								}
 
-                                if(pRequest)
-                                {/* Found the matched request */
-                                    /* snprint_value converts the value into a text string. If the buffer is not big enough, it might return -1 and only  */
-                                    /* put data type in. So we use a large temp buffer here.                                                              */
-                                    int cvtSts;
-                                    cvtSts = snprint_value(pBuf, sizeof(pBuf), pVar->name, pVar->name_length, pVar);
-                                    if(cvtSts <= 0)
-                                    {
-                                        errlogPrintf("Conversion failed for record [%s]\n", pRequest->pRecord->name);
-                                        pRequest->errCode = SNMP_REQUEST_CVT_ERR;	/* Conversion failure */
-                                    }
-                                    else
-                                    {
-                                        strncpy(pRequest->pValStr, pBuf, pRequest->valStrLen - 1);
-                                        pRequest->pValStr[pRequest->valStrLen - 1] = '\0';
-                                        pRequest->errCode = SNMP_REQUEST_NO_ERR;
-                                    }
-                                    pRequest->opDone = 1;
+								/* Remove the request from link list */
+								epicsMutexLock(pSnmpAgent->mutexLock); 
+								ellDelete(&requestQryList, (ELLNODE *) pRequest);
+								epicsMutexUnlock(pSnmpAgent->mutexLock); 
+							}
+							else
+							{
+								snprint_objid(pBuf, sizeof(pBuf), pVar->name, pVar->name_length);
+								errlogPrintf("Get response for %s, but no matched request!\n", pBuf);
+							}
 
-                                    /* process record */
-                                    if(pRequest->pRecord)
-                                    {
-                                        dbScanLock(pRequest->pRecord);
-                                        (*(pRequest->pRecord->rset->process))(pRequest->pRecord);
-                                        dbScanUnlock(pRequest->pRecord);
-                                    }
+							pVar = pVar->next_variable;
+						}
+					}
+					else
+					{/* Successfully got response, and with error in the response, error is defined by errstat and errindex */
+						for (varIndex = 1; pVar && varIndex != respQryPdu->errindex; pVar = pVar->next_variable, varIndex++)
+						{
+							for(pRequest = (SNMP_REQUEST *)ellFirst(&requestQryList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
+							{/* Looking for request with matched Oid */
+								if(!memcmp(pVar->name, pRequest->objectId.requestOid, pRequest->objectId.requestOidLen * sizeof(oid))) break;
+							}
 
-                                    /* Remove the request from link list */
-                                    epicsMutexLock(pSnmpAgent->mutexLock);
-                                    ellDelete(&requestQryList, (ELLNODE *) pRequest);
-                                    epicsMutexUnlock(pSnmpAgent->mutexLock);
-                                }
-                                else
-                                {
-                                    snprint_objid(pBuf, sizeof(pBuf), pVar->name, pVar->name_length);
-                                    errlogPrintf("Get response for %s, but no matched request!\n", pBuf);
-                                }
-                            }
+							if(pRequest)
+							{/* Found the matched request */
+								/* snprint_value converts the value into a text string. If the buffer is not big enough, it might return -1 and only  */
+								/* put data type in. So we use a large temp buffer here.                                                              */
+								int cvtSts;
+								cvtSts = snprint_value(pBuf, sizeof(pBuf), pVar->name, pVar->name_length, pVar);
+								if(cvtSts <= 0)
+								{
+									errlogPrintf("Conversion failed for record [%s]\n", pRequest->pRecord->name);
+									pRequest->errCode = SNMP_REQUEST_CVT_ERR;	/* Conversion failure */
+								}
+								else
+								{
+									strncpy(pRequest->pValStr, pBuf, pRequest->valStrLen - 1);
+									pRequest->pValStr[pRequest->valStrLen - 1] = '\0';
+									pRequest->errCode = SNMP_REQUEST_NO_ERR;
+								}
+								pRequest->opDone = 1;
 
-                            if(pVar)
-                                snprint_objid(pBuf, sizeof(pBuf), pVar->name, pVar->name_length);
-                            else
-                                strcpy(pBuf, "(none)");
+								/* process record */
+								if(pRequest->pRecord)
+								{
+									dbScanLock(pRequest->pRecord);
+									(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
+									dbScanUnlock(pRequest->pRecord);
+								}
 
-                            sprintf(pErrBuf, "\nrequestQryList: snmp_sess_synch_response: errindex %ld\n\t%s %s %s\n",
-                                respQryPdu->errindex, pSnmpAgent->pActiveSession->peername, pRequest->objectId.requestName, pBuf);
-                            errlogPrintf("%s", pErrBuf);
-                            snmp_sess_perror(pErrBuf, pSnmpAgent->pActiveSession);
-                        }
+								/* Remove the request from link list */
+								epicsMutexLock(pSnmpAgent->mutexLock);
+								ellDelete(&requestQryList, (ELLNODE *) pRequest);
+								epicsMutexUnlock(pSnmpAgent->mutexLock);
+							}
+							else
+							{
+								snprint_objid(pBuf, sizeof(pBuf), pVar->name, pVar->name_length);
+								errlogPrintf("Get response for %s, but no matched request!\n", pBuf);
+							}
+						}
 
-                        /* If still some queries in link list and can't find variables to match */
-                        for(pRequest = (SNMP_REQUEST *)ellFirst(&requestQryList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
-                        {/* Go thru the request list to process all records */
+						if(pVar)
+							snprint_objid(pBuf, sizeof(pBuf), pVar->name, pVar->name_length);
+						else
+							strcpy(pBuf, "(none)");
 
-                             pRequest->errCode = SNMP_REQUEST_QRY_NOANS; /* snmp request no answer in response */
-                             pRequest->opDone = 1;
+						sprintf(pErrBuf, "\nrequestQryList: snmp_sess_synch_response: errindex %ld\n\t%s %s %s\n",
+							respQryPdu->errindex, pSnmpAgent->pActiveSession->peername, pRequest->objectId.requestName, pBuf);
+						errlogPrintf("%s", pErrBuf);
+						snmp_sess_perror(pErrBuf, pSnmpAgent->pActiveSession);
+					}
 
-                            /* process record */
-                            if(pRequest->pRecord)
-                            {
-                                dbScanLock(pRequest->pRecord);
-                                (*(pRequest->pRecord->rset->process))(pRequest->pRecord);
-                                dbScanUnlock(pRequest->pRecord);
-                            }
-                            errlogPrintf("%s: Response doesn't have a match!\n", pRequest->pRecord->name);
-                        }
+					/* If still some queries in link list and can't find variables to match */
+					for(pRequest = (SNMP_REQUEST *)ellFirst(&requestQryList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
+					{/* Go thru the request list to process all records */
 
-                        break;
-                    case STAT_TIMEOUT:
-                        for(pRequest = (SNMP_REQUEST *)ellFirst(&requestQryList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
-                        {/* Go thru the request list to process all records */
+						 pRequest->errCode = SNMP_REQUEST_QRY_NOANS; /* snmp request no answer in response */
+						 pRequest->opDone = 1;
 
-                             pRequest->errCode = SNMP_REQUEST_QRY_TOUT; /* snmp request timeout */
-                             pRequest->opDone = 1;
+						/* process record */
+						if(pRequest->pRecord)
+						{
+							dbScanLock(pRequest->pRecord);
+							(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
+							dbScanUnlock(pRequest->pRecord);
+						}
+						errlogPrintf("%s: Response doesn't have a match!\n", pRequest->pRecord->name);
+					}
 
-                            /* process record */
-                            if(pRequest->pRecord)
-                            {
-                                dbScanLock(pRequest->pRecord);
-                                (*(pRequest->pRecord->rset->process))(pRequest->pRecord);
-                                dbScanUnlock(pRequest->pRecord);
-                            }
-                        }
+					break;
+				case STAT_TIMEOUT:
+					for(pRequest = (SNMP_REQUEST *)ellFirst(&requestQryList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
+					{/* Go thru the request list to process all records */
 
-                        errlogPrintf("%s: Snmp Query Timeout\n", pSnmpAgent->pActiveSession->peername);
-                        break;
-                    case STAT_ERROR:
-                    default:
-                    {
-                        int liberr, syserr;
-                        char * errstr;
-                        snmp_sess_perror(pSnmpAgent->pActiveSession->peername, pSnmpAgent->pActiveSession);
-                        snmp_sess_error(pSnmpAgent->pSess, &liberr, &syserr, &errstr);
+						 pRequest->errCode = SNMP_REQUEST_QRY_TOUT; /* snmp request timeout */
+						 pRequest->opDone = 1;
 
-                        for(pRequest = (SNMP_REQUEST *)ellFirst(&requestQryList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
-                        {/* Go thru the request list to process all records */
+						/* process record */
+						if(pRequest->pRecord)
+						{
+							dbScanLock(pRequest->pRecord);
+							(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
+							dbScanUnlock(pRequest->pRecord);
+						}
+					}
 
-                             pRequest->errCode = SNMP_REQUEST_SNMP_ERR |(liberr?liberr:syserr); /* snmp error */
-                             pRequest->opDone = 1;
+					errlogPrintf("%s: Snmp Query Timeout\n", pSnmpAgent->pActiveSession->peername);
+					break;
+				case STAT_ERROR:
+				default:
+				{
+					int liberr, syserr;
+					char * errstr;
+					snmp_sess_perror(pSnmpAgent->pActiveSession->peername, pSnmpAgent->pActiveSession);
+					snmp_sess_error(pSnmpAgent->pSess, &liberr, &syserr, &errstr);
 
-                            /* process record */
-                            if(pRequest->pRecord)
-                            {
-                                dbScanLock(pRequest->pRecord);
-                                (*(pRequest->pRecord->rset->process))(pRequest->pRecord);
-                                dbScanUnlock(pRequest->pRecord);
-                            }
-                        }
+					for(pRequest = (SNMP_REQUEST *)ellFirst(&requestQryList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
+					{/* Go thru the request list to process all records */
 
-                        errlogPrintf("Query %s error %s!\n", pSnmpAgent->pActiveSession->peername, errstr);
-                        free(errstr);
-                    }
-                        break;
-                }
+						 pRequest->errCode = SNMP_REQUEST_SNMP_ERR |(liberr?liberr:syserr); /* snmp error */
+						 pRequest->opDone = 1;
 
-                /* Free the response PDU for this request. */
-                /*If error happened before, the reqQryPdu is already freed by snmp_sess_synch_response, the respQryPdu is NULL */
-                /* If no error happened, respQryPdu is cloned from reqQryPdu and reqQryPdu is freed */
-                if(respQryPdu)
-                {
-                    snmp_free_pdu(respQryPdu);
-                    respQryPdu = NULL;
-                    if(SNMP_DRV_DEBUG > 1) printf("Oper task for agent[%s] frees PDU!\n", pSnmpAgent->pActiveSession->peername);
-                }
+						/* process record */
+						if(pRequest->pRecord)
+						{
+							dbScanLock(pRequest->pRecord);
+							(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
+							dbScanUnlock(pRequest->pRecord);
+						}
+					}
 
-            }/* Query PDU */
-        }/* process requests */
+					errlogPrintf("Query %s error %s!\n", pSnmpAgent->pActiveSession->peername, errstr);
+					free(errstr);
+				}
+					break;
+			}
 
-    }/* infinite loop */
+			/* Free the response PDU for this request. */
+			/*If error happened before, the reqQryPdu is already freed by snmp_sess_synch_response, the respQryPdu is NULL */
+			/* If no error happened, respQryPdu is cloned from reqQryPdu and reqQryPdu is freed */
+			if(respQryPdu)
+			{
+				snmp_free_pdu(respQryPdu);
+				respQryPdu = NULL;
+				if(SNMP_DRV_DEBUG > 1) printf("Oper task for agent[%s] frees PDU!\n", pSnmpAgent->pActiveSession->peername);
+			}
+
+		}	/* Query PDU */
+	/* process requests */
+
+    }	/* infinite loop */
 
     snmp_sess_close(pSnmpAgent->pSess);
     /* We should never get here */
@@ -634,7 +666,8 @@ int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion,
         {
             char * ver_msg[5]={"Ver1", "Ver2c", "Ver2u", "V3", "Unknown"};
             printf("Active SNMP agent: %s,", pSnmpAgent->pActiveSession->peername);
-            printf("\tcommunity: %s, version: %s\n", pSnmpAgent->pActiveSession->community, ver_msg[MIN(4,pSnmpAgent->pActiveSession->version)]);
+        /*	printf("\tcommunity: %s, version: %s\n", pSnmpAgent->pActiveSession->community, ver_msg[MIN(4,pSnmpAgent->pActiveSession->version)]); */
+        	printf("\tcommunity: %s, version: %s\n", pSnmpAgent->snmpSession.community, ver_msg[MIN(4,pSnmpAgent->pActiveSession->version)]);
         }
 
         ellInit(&(pSnmpAgent->snmpReqPtrList));
@@ -763,13 +796,17 @@ int snmpQuerySingleVar(SNMP_REQUEST * pRequest)
         case STAT_SUCCESS:
             pVar = respQryPdu->variables;	/* Since we are querying single var, this must be it */
             if (respQryPdu->errstat == SNMP_ERR_NOERROR)
-            {/* Successfully got response, and no error in the response */
+            {	/* Successfully got response, and no error in the response */
 
                 /* Check if the request has the matched Oid */
-                if(pVar && !memcmp(pVar->name, pRequest->objectId.requestOid, pRequest->objectId.requestOidLen * sizeof(oid)))
-                {/* resp matched request */
-                    /* snprint_value converts the value into a text string. If the buffer is not big enough, it might return -1 and only  */
-                    /* put data type in. So we use a large temp buffer here.                                                              */
+                if(pVar && !memcmp(	pVar->name, pRequest->objectId.requestOid,
+									pRequest->objectId.requestOidLen * sizeof(oid) ) )
+                {	/* resp matched request */
+                    /*
+					 * snprint_value converts the value into a text string.
+					 * If the buffer is not big enough, it might return -1 and only put data type in.
+					 * So we use a large temp buffer here.
+					 */
                     int cvtSts;
                     cvtSts = snprint_value(pBuf, sizeof(pBuf), pVar->name, pVar->name_length, pVar);
                     if(cvtSts <= 0)
@@ -786,31 +823,40 @@ int snmpQuerySingleVar(SNMP_REQUEST * pRequest)
                 }
                 else
                 {/* resp did not match request */
-                    snprint_objid(pBuf, sizeof(pBuf), pVar->name, pVar->name_length);
-                    errlogPrintf("Get response for %s, but no matched request!\n", pBuf);
+					char	reqId[1024];
+                    snprint_objid( pBuf,	sizeof(pBuf),	pVar->name, pVar->name_length );
+                    snprint_objid( reqId,	sizeof(reqId),	pRequest->objectId.requestOid,
+															pRequest->objectId.requestOidLen );
+                    errlogPrintf("Get response for %s, but requested %s!\n", pBuf, reqId );
                     rtn = -1;
                 }
             }
             else
-            {/* Successfully got response, and with error in the response, error is defined by errstat and errindex */
-             /* Since we are querying single var, error means the query is no good */
+            {	/*
+				 * Successfully got response, and with error in the response,
+				 * error is defined by errstat and errindex
+             	 *
+				 * Since we are querying single var,
+				 * error means the query is no good
+				 */
                 if(pVar)
                     snprint_objid(pBuf, sizeof(pBuf), pVar->name, pVar->name_length);
                 else
                     strcpy(pBuf, "(none)");
 
-					sprintf(pErrBuf, "\nsnmpQuerySingleVar: snmp_sess_synch_response: errindex %ld\n\t%s %s %s\n",
+				sprintf(pErrBuf, "\nsnmpQuerySingleVar: snmp_sess_synch_response: errindex %ld\n\t%s %s %s\n",
                     respQryPdu->errindex, pRequest->pSnmpAgent->pActiveSession->peername, pRequest->objectId.requestName, pBuf);
                 errlogPrintf("%s", pErrBuf);
                 snmp_sess_perror(pErrBuf, pRequest->pSnmpAgent->pActiveSession);
                 rtn = -1;
             }
-
             break;
+
         case STAT_TIMEOUT:
             errlogPrintf("%s: Snmp Query Timeout\n", pRequest->pSnmpAgent->pActiveSession->peername);
             rtn = -1;
             break;
+
         case STAT_ERROR:
         default:
         {
@@ -863,14 +909,23 @@ static long Snmp_EPICS_Report(int level)
 
     if(level > 0)   /* we only get into link list for detail when user wants */
     {
-        for(pSnmpAgent=(SNMP_AGENT *)ellFirst(&snmpAgentList); pSnmpAgent; pSnmpAgent = (SNMP_AGENT *)ellNext((ELLNODE *)pSnmpAgent))
+        for (	pSnmpAgent = (SNMP_AGENT *)ellFirst(&snmpAgentList);
+				pSnmpAgent;
+				pSnmpAgent = (SNMP_AGENT *)ellNext((ELLNODE *)pSnmpAgent) )
         {
             printf("\tSNMP agent: %s\n", pSnmpAgent->snmpSession.peername);
             if(level > 1)
             {
                 char * ver_msg[5]={"Ver1", "Ver2c", "Ver2u", "V3", "Unknown"};
-                /* Due to snmp_sess_open and snmp_sess_session don't guarantee string terminator of community but use community_len, we use original snmpSession here */
-                printf("\tcommunity: %s, version: %s, %d variables\n\n", pSnmpAgent->snmpSession.community, ver_msg[MIN(4,pSnmpAgent->snmpSession.version)], pSnmpAgent->snmpReqPtrList.count);
+                /*
+				 * Due to snmp_sess_open and snmp_sess_session don't guarantee
+				 * string terminator of community but use community_len,
+				 * we use original snmpSession here
+				 */
+                printf(	"\tcommunity: %s, version: %s, %d variables\n\n",
+						pSnmpAgent->snmpSession.community,
+						ver_msg[MIN(4,pSnmpAgent->snmpSession.version)],
+						pSnmpAgent->snmpReqPtrList.count );
             }
         }
     }
