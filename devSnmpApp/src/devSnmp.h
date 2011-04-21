@@ -50,6 +50,7 @@
 #include <aiRecord.h>
 #include <aoRecord.h>
 #include <mbbiRecord.h>
+#include <biRecord.h>
 #include <stringinRecord.h>
 #include <stringoutRecord.h>
 #include <longinRecord.h>

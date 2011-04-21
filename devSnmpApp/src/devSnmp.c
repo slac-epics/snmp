@@ -36,6 +36,11 @@ static long init_mbbi_snmpV1(struct mbbiRecord *pmbbi);
 static long init_mbbi_snmpV2c(struct mbbiRecord *pmbbi);
 static long read_mbbi_snmp(struct mbbiRecord *pmbbi);
 
+static long init_bi_snmp(struct biRecord *pbi, long snmpVersion);
+static long init_bi_snmpV1(struct biRecord *pbi);
+static long init_bi_snmpV2c(struct biRecord *pbi);
+static long read_bi_snmp(struct biRecord *pbi);
+
 static long init_lo_snmp(struct longoutRecord *plo, long snmpVersion);
 static long init_lo_snmpV1(struct longoutRecord *plo);
 static long init_lo_snmpV2c(struct longoutRecord *plo);
@@ -71,6 +76,7 @@ SNMP_DEV_SUP_SET devAiSnmpV1 = {6, NULL, NULL, init_ai_snmpV1,  NULL, read_ai_sn
 SNMP_DEV_SUP_SET devAoSnmpV1 = {6, NULL, NULL, init_ao_snmpV1,  NULL, write_ao_snmp, NULL};
 SNMP_DEV_SUP_SET devLiSnmpV1 = {6, NULL, NULL, init_li_snmpV1,  NULL, read_li_snmp, NULL};
 SNMP_DEV_SUP_SET devMbbiSnmpV1={6, NULL, NULL, init_mbbi_snmpV1,  NULL, read_mbbi_snmp, NULL};
+SNMP_DEV_SUP_SET devBiSnmpV1 = {6, NULL, NULL, init_bi_snmpV1,  NULL, read_bi_snmp, NULL};
 SNMP_DEV_SUP_SET devLoSnmpV1 = {6, NULL, NULL, init_lo_snmpV1,  NULL, write_lo_snmp, NULL};
 SNMP_DEV_SUP_SET devSiSnmpV1 = {6, NULL, NULL, init_si_snmpV1,  NULL, read_si_snmp, NULL};
 SNMP_DEV_SUP_SET devSoSnmpV1 = {6, NULL, NULL, init_so_snmpV1,  NULL, write_so_snmp, NULL};
@@ -80,6 +86,7 @@ SNMP_DEV_SUP_SET devAiSnmpV2c = {6, NULL, NULL, init_ai_snmpV2c,  NULL, read_ai_
 SNMP_DEV_SUP_SET devAoSnmpV2c = {6, NULL, NULL, init_ao_snmpV2c,  NULL, write_ao_snmp, NULL};
 SNMP_DEV_SUP_SET devLiSnmpV2c = {6, NULL, NULL, init_li_snmpV2c,  NULL, read_li_snmp, NULL};
 SNMP_DEV_SUP_SET devMbbiSnmpV2c={6, NULL, NULL, init_mbbi_snmpV2c,  NULL, read_mbbi_snmp, NULL};
+SNMP_DEV_SUP_SET devBiSnmpV2c={6, NULL, NULL, init_bi_snmpV2c,  NULL, read_bi_snmp, NULL};
 SNMP_DEV_SUP_SET devLoSnmpV2c = {6, NULL, NULL, init_lo_snmpV2c,  NULL, write_lo_snmp, NULL};
 SNMP_DEV_SUP_SET devSiSnmpV2c = {6, NULL, NULL, init_si_snmpV2c,  NULL, read_si_snmp, NULL};
 SNMP_DEV_SUP_SET devSoSnmpV2c = {6, NULL, NULL, init_so_snmpV2c,  NULL, write_so_snmp, NULL};
@@ -90,6 +97,7 @@ epicsExportAddress(dset, devAiSnmpV1);
 epicsExportAddress(dset, devAoSnmpV1);
 epicsExportAddress(dset, devLiSnmpV1);
 epicsExportAddress(dset, devMbbiSnmpV1);
+epicsExportAddress(dset, devBiSnmpV1);
 epicsExportAddress(dset, devLoSnmpV1);
 epicsExportAddress(dset, devSiSnmpV1);
 epicsExportAddress(dset, devSoSnmpV1);
@@ -99,6 +107,7 @@ epicsExportAddress(dset, devAiSnmpV2c);
 epicsExportAddress(dset, devAoSnmpV2c);
 epicsExportAddress(dset, devLiSnmpV2c);
 epicsExportAddress(dset, devMbbiSnmpV2c);
+epicsExportAddress(dset, devBiSnmpV2c);
 epicsExportAddress(dset, devLoSnmpV2c);
 epicsExportAddress(dset, devSiSnmpV2c);
 epicsExportAddress(dset, devSoSnmpV2c);
@@ -489,6 +498,110 @@ static long read_mbbi_snmp(struct mbbiRecord *pmbbi)
             {
                 recGblSetSevr(pmbbi, READ_ALARM, INVALID_ALARM);
                 errlogPrintf("Record [%s] parsing response [%s] error!\n", pmbbi->name, pValStr);
+				rtn = -1;
+			}
+        }
+    }	/* post-process */
+
+    return(rtn);
+}
+
+static long init_bi_snmp(struct biRecord *pbi, long snmpVersion)
+{
+    int status = 0;
+
+    /* bi.inp must be INST_IO */
+    if(pbi->inp.type != INST_IO)
+    {
+        recGblRecordError(S_db_badField,(void *)pbi, "devBiSnmp (init_record) Illegal INP field");
+        pbi->pact = TRUE;
+        return(S_db_badField);
+    }
+
+    status = snmpRequestInit((dbCommon *)pbi, pbi->inp.value.instio.string, snmpVersion, MAX_CA_STRING_SIZE, 0, 'i');
+
+    if (status)
+    {
+        recGblRecordError(S_db_badField, (void *)pbi,"devBiSnmp (init_record) bad parameters");
+        pbi->pact = TRUE;
+        return(S_db_badField);
+    }
+
+    return(status);
+}
+
+static long init_bi_snmpV1(struct biRecord *pbi)
+{
+    return init_bi_snmp(pbi, SNMP_VERSION_1);
+}
+
+static long init_bi_snmpV2c(struct biRecord *pbi)
+{
+    return init_bi_snmp(pbi, SNMP_VERSION_2c);
+}
+
+static long read_bi_snmp(struct biRecord *pbi)
+{
+    SNMP_REQUEST  *pRequest = (SNMP_REQUEST *)(pbi->dpvt);
+    int rtn = -1;
+    char *pValStr;
+    unsigned int u32temp;
+
+    if(!pRequest) return(-1);
+
+    if(!pbi->pact)
+    {	/* pre-process */
+        /* Clean up the request */
+        pRequest->errCode = SNMP_REQUEST_NO_ERR;
+        pRequest->opDone = 0;
+
+        if(epicsMessageQueueTrySend(pRequest->pSnmpAgent->msgQ_id, (void *)&pRequest, sizeof(SNMP_REQUEST *)) == -1)
+        {
+            recGblSetSevr(pbi, READ_ALARM, INVALID_ALARM);
+            errlogPrintf("read_bi_snmp: epicsMessageQueueTrySend Error on [%s]\n", pbi->name);
+            rtn = -1;
+        }
+        else
+        {
+            pbi->pact = TRUE;
+            rtn = 0;
+        }
+    }	/* pre-process */
+
+    else
+
+    {	/* post-process */
+        if( (!pRequest->opDone) || pRequest->errCode )
+        {
+            recGblSetSevr(pbi, READ_ALARM, INVALID_ALARM);
+            errlogPrintf("Record [%s] receive error code [0x%08x]!\n", pbi->name, pRequest->errCode);
+            rtn = -1;
+        }
+        else
+        {
+            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] receives string [%s]!\n", pbi->name, pRequest->pValStr);
+
+            pValStr = strrchr(pRequest->pValStr, ':');
+            if ( pValStr == NULL )
+				pValStr = pRequest->pValStr;
+            else
+				pValStr++;
+
+            /* skip non-digit, particularly because of WIENER crate has ON(1), OFF(0) */
+            for (; isdigit(*pValStr) == 0 && *pValStr != '\0'; )
+				++pValStr;
+
+            /* The bi record for snmp only handles unsigned int */
+            if ( pValStr && sscanf( pValStr, "%u", &u32temp ) )
+            {
+                pbi->rval	= u32temp & 0x7FFFFFFF;	/* Get rid of MSB since pbi->val is signed */
+                /* pbi->udf	= FALSE; */
+				rtn = 0;
+			}
+            else
+            {
+                recGblSetSevr(pbi, READ_ALARM, INVALID_ALARM);
+                errlogPrintf("Record [%s] parsing response [%s] error!\n", pbi->name, pValStr);
 				rtn = -1;
 			}
         }
