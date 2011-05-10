@@ -180,12 +180,12 @@ static long read_ai_snmp(struct aiRecord *pai)
         if( (!pRequest->opDone) || pRequest->errCode )
         {
             recGblSetSevr(pai, READ_ALARM, INVALID_ALARM);
-            errlogPrintf("Record [%s] receive error code [0x%08x]!\n", pai->name, pRequest->errCode);
+            errlogPrintf("Record [%s] received error code [0x%08x]!\n", pai->name, pRequest->errCode);
             rtn = -1;
         }
         else
         {
-            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] receives string [%s]!\n", pai->name, pRequest->pValStr);
+            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] received string [%s]\n", pai->name, pRequest->pValStr);
 
             pValStr = strrchr(pRequest->pValStr, ':');
             if(pValStr == NULL) pValStr = pRequest->pValStr;
@@ -294,7 +294,7 @@ static long write_ao_snmp(struct aoRecord *pao)
         if( (!pRequest->opDone) || pRequest->errCode )
         {
             recGblSetSevr(pao, WRITE_ALARM, INVALID_ALARM);
-            errlogPrintf("Record [%s] receive error code [0x%08x]!\n", pao->name, pRequest->errCode);
+            errlogPrintf("Record [%s] received error code [0x%08x]!\n", pao->name, pRequest->errCode);
             return -1;
         }
     }/* post-process */
@@ -368,12 +368,12 @@ static long read_li_snmp(struct longinRecord *pli)
         if( (!pRequest->opDone) || pRequest->errCode )
         {
             recGblSetSevr(pli, READ_ALARM, INVALID_ALARM);
-            errlogPrintf("Record [%s] receive error code [0x%08x]!\n", pli->name, pRequest->errCode);
+            errlogPrintf("Record [%s] received error code [0x%08x]!\n", pli->name, pRequest->errCode);
             rtn = -1;
         }
         else
         {
-            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] receives string [%s]!\n", pli->name, pRequest->pValStr);
+            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] received string [%s]\n", pli->name, pRequest->pValStr);
 
             pValStr = strrchr(pRequest->pValStr, ':');
             if(pValStr == NULL) pValStr = pRequest->pValStr;
@@ -470,12 +470,12 @@ static long read_mbbi_snmp(struct mbbiRecord *pmbbi)
         if( (!pRequest->opDone) || pRequest->errCode )
         {
             recGblSetSevr(pmbbi, READ_ALARM, INVALID_ALARM);
-            errlogPrintf("Record [%s] receive error code [0x%08x]!\n", pmbbi->name, pRequest->errCode);
+            errlogPrintf("Record [%s] received error code [0x%08x]!\n", pmbbi->name, pRequest->errCode);
             rtn = -1;
         }
         else
         {
-            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] receives string [%s]!\n", pmbbi->name, pRequest->pValStr);
+            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] received string [%s]\n", pmbbi->name, pRequest->pValStr);
 
             pValStr = strrchr(pRequest->pValStr, ':');
             if ( pValStr == NULL )
@@ -574,12 +574,12 @@ static long read_bi_snmp(struct biRecord *pbi)
         if( (!pRequest->opDone) || pRequest->errCode )
         {
             recGblSetSevr(pbi, READ_ALARM, INVALID_ALARM);
-            errlogPrintf("Record [%s] receive error code [0x%08x]!\n", pbi->name, pRequest->errCode);
+            errlogPrintf("Record [%s] received error code [0x%08x]!\n", pbi->name, pRequest->errCode);
             rtn = -1;
         }
         else
         {
-            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] receives string [%s]!\n", pbi->name, pRequest->pValStr);
+            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] received string [%s]\n", pbi->name, pRequest->pValStr);
 
             pValStr = strrchr(pRequest->pValStr, ':');
             if ( pValStr == NULL )
@@ -701,7 +701,7 @@ static long write_lo_snmp(struct longoutRecord *plo)
         if( (!pRequest->opDone) || pRequest->errCode )
         {
             recGblSetSevr(plo, WRITE_ALARM, INVALID_ALARM);
-            errlogPrintf("Record [%s] receive error code [0x%08x]!\n", plo->name, pRequest->errCode);
+            errlogPrintf("Record [%s] received error code [0x%08x]!\n", plo->name, pRequest->errCode);
             return -1;
         }
     }/* post-process */
@@ -775,12 +775,12 @@ static long read_si_snmp(struct stringinRecord *psi)
         if( (!pRequest->opDone) || pRequest->errCode )
         {
             recGblSetSevr(psi, READ_ALARM, INVALID_ALARM);
-            errlogPrintf("Record [%s] receive error code [0x%08x]!\n", psi->name, pRequest->errCode);
+            errlogPrintf("Record [%s] received error code [0x%08x]!\n", psi->name, pRequest->errCode);
             rtn = -1;
         }
         else
         {
-            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] receives string [%s]!\n", psi->name, pRequest->pValStr);
+            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] received string [%s]\n", psi->name, pRequest->pValStr);
 
             if((pValStr = strrchr(pRequest->pValStr, ':')) != NULL)
             {
@@ -889,7 +889,12 @@ static long write_so_snmp(struct stringoutRecord *pso)
         pRequest->errCode = SNMP_REQUEST_NO_ERR;
         pRequest->opDone = 0;
         /* Give the value */
-        strncpy(pRequest->pValStr, pso->val, MAX_CA_STRING_SIZE-1);
+		if ( pRequest->valLength != 0 )
+		{
+        	snprintf( &pRequest->pValStr[0], MAX_CA_STRING_SIZE-1, "%-*.*s", pRequest->valLength, pRequest->valLength, pso->val );
+		}
+		else
+        	strncpy(pRequest->pValStr, pso->val, MAX_CA_STRING_SIZE-1);
         pRequest->pValStr[MAX_CA_STRING_SIZE-1] = '\0';
 
         if(epicsMessageQueueTrySend(pRequest->pSnmpAgent->msgQ_id, (void *)&pRequest, sizeof(SNMP_REQUEST *)) == -1)
@@ -909,7 +914,7 @@ static long write_so_snmp(struct stringoutRecord *pso)
         if( (!pRequest->opDone) || pRequest->errCode )
         {
             recGblSetSevr(pso, WRITE_ALARM, INVALID_ALARM);
-            errlogPrintf("Record [%s] receive error code [0x%08x]!\n", pso->name, pRequest->errCode);
+            errlogPrintf("Record [%s] received error code [0x%08x]!\n", pso->name, pRequest->errCode);
             return -1;
         }
     }/* post-process */
@@ -992,12 +997,12 @@ static long read_wf_snmp(struct waveformRecord *pwf)
         if( (!pRequest->opDone) || pRequest->errCode )
         {
             recGblSetSevr(pwf, READ_ALARM, INVALID_ALARM);
-            errlogPrintf("Record [%s] receive error code [0x%08x]!\n", pwf->name, pRequest->errCode);
+            errlogPrintf("Record [%s] received error code [0x%08x]!\n", pwf->name, pRequest->errCode);
             rtn = -1;
         }
         else
         {
-            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] receives string [%s]!\n", pwf->name, pRequest->pValStr);
+            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] received string [%s]\n", pwf->name, pRequest->pValStr);
 
             switch(pwf->ftvl)
             {

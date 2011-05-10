@@ -131,6 +131,8 @@ typedef struct SNMP_REQUEST
     				/* o: OBJID, s: STRING, x: HEX STRING, d: DECIMAL STRING, b: BITS */
     				/* U: unsigned int64, I: signed int64, F: float, D: double */
 
+    unsigned int	valLength;	/* Value length: 0 = default, non-zero = pad to this length */
+
     dbCommon		*pRecord;
     SNMP_AGENT		*pSnmpAgent;
 

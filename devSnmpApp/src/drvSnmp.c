@@ -277,15 +277,20 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 						else
 							strcpy(pBuf, "(none)");
 
-						sprintf(pErrBuf, "\nrequestCmdList: snmp_sess_synch_response: errindex %ld\n\t%s %s %s\n",
-							respCmdPdu->errindex, pSnmpAgent->pActiveSession->peername, pRequest->objectId.requestName, pBuf);
+						sprintf(pErrBuf,
+								"\nrequestCmdList: snmp_sess_synch_response: errindex %ld\n"
+								"\tdevName: %s\n"
+								"\treqName: %s\n"
+								"\tbuffer:  %s\n",
+							respCmdPdu->errindex,
+							pSnmpAgent->pActiveSession->peername, pRequest->objectId.requestName, pBuf );
 						errlogPrintf("%s", pErrBuf);
 						snmp_sess_perror(pErrBuf, pSnmpAgent->pActiveSession);
 					}
 
 					/* If still some queries in link list and can't find variables to match */
 					for(pRequest = (SNMP_REQUEST *)ellFirst(&requestCmdList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
-					{/* Go thru the request list to process all records */
+					{	/* Go thru the request list to process all records */
 
 						 pRequest->errCode = SNMP_REQUEST_CMD_NOANS; /* snmp request no answer in response */
 						 pRequest->opDone = 1;
@@ -297,10 +302,10 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 							(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
 							dbScanUnlock(pRequest->pRecord);
 						}
-						errlogPrintf("%s: Response doesn't have a match!\n", pRequest->pRecord->name);
+						errlogPrintf( "Request %s not handled!\n", pRequest->pRecord->name);
 					}
-
 					break;
+
 				case STAT_TIMEOUT:
 					for(pRequest = (SNMP_REQUEST *)ellFirst(&requestCmdList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
 					{/* Go thru the request list to process all records */
@@ -580,7 +585,8 @@ int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion,
     char peerName[81];
     char community[81];
     char oidStr[81];
-	char	typeFromIO	= '?';
+	char			typeFromIO	= '?';
+	unsigned int	lenFromIO	= 0;
 
     int n;
 
@@ -611,7 +617,7 @@ int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion,
     if(snmpVersion != SNMP_VERSION_1 && snmpVersion != SNMP_VERSION_3)
         snmpVersion = SNMP_VERSION_2c;
 
-    n = sscanf(ioString, "%s %s %s %c", peerName, community, oidStr, &typeFromIO );
+    n = sscanf(ioString, "%s %s %s %c %u", peerName, community, oidStr, &typeFromIO, &lenFromIO );
     if ( n < 3 )
 	{
 		errlogPrintf( "snmpRequestInit Error: Invalid INP/OUT string: %s\n", ioString );
@@ -718,6 +724,7 @@ int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion,
 
     pSnmpRequest->cmd = cmd;
     pSnmpRequest->type = type;
+    pSnmpRequest->valLength = lenFromIO;
 
     pSnmpRequest->pRecord = pRecord;
     pSnmpRequest->pSnmpAgent = pSnmpAgent;
@@ -844,8 +851,14 @@ int snmpQuerySingleVar(SNMP_REQUEST * pRequest)
                 else
                     strcpy(pBuf, "(none)");
 
-				sprintf(pErrBuf, "\nsnmpQuerySingleVar: snmp_sess_synch_response: errindex %ld\n\t%s %s %s\n",
-                    respQryPdu->errindex, pRequest->pSnmpAgent->pActiveSession->peername, pRequest->objectId.requestName, pBuf);
+				sprintf( pErrBuf,
+						"\nsnmpQuerySingleVar: snmp_sess_synch_response: errindex %ld\n"
+						"\tdevName: %s\n"
+						"\treqName: %s\n"
+						"\tbuffer:  %s\n",
+                    	respQryPdu->errindex,
+						pRequest->pSnmpAgent->pActiveSession->peername,
+						pRequest->objectId.requestName, pBuf);
                 errlogPrintf("%s", pErrBuf);
                 snmp_sess_perror(pErrBuf, pRequest->pSnmpAgent->pActiveSession);
                 rtn = -1;
