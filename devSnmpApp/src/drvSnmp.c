@@ -34,9 +34,6 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
     ELLLIST requestQryList;
     ELLLIST requestCmdList;
 
-    struct snmp_pdu * respQryPdu;
-    struct snmp_pdu * respCmdPdu;
-
     struct variable_list *pVar;
     int varIndex;
     char pBuf[1024];
@@ -57,9 +54,6 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
             epicsThreadSleep(2.0);  /* Avoid super loop to starve CPU */
 			continue;
         }
- 
-        /* some requests come in */
-		if(SNMP_DRV_DEBUG > 1) printf("Oper task for agent[%s] gets requests!\n", pSnmpAgent->pActiveSession->peername);
 
 		/* Figure out how many requests in queue */
 		NofReqs = epicsMessageQueuePending(pSnmpAgent->msgQ_id);
@@ -67,7 +61,14 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 		/* Deal up to max number of variables per request, don't forget we already got one request */
 		/* Since we will do both query and commmand, NofReqs + 1 is the total of both */
 		NofReqs = MIN( (NofReqs + 1), (MAX(1, snmpMaxVarsPerMsg)) ) - 1;
+ 
+        /* some requests come in */
+		if(SNMP_DRV_DEBUG >= 2) printf("Snmp_Operation loop for agent[%s] processing %d requests\n", pSnmpAgent->pActiveSession->peername, NofReqs + 1 );
 
+		if ( requestQryList.node.next || requestQryList.node.previous || requestQryList.count )
+			printf( "Found %d stale requestQry nodes.?\n", requestQryList.count );
+		if ( requestCmdList.node.next || requestCmdList.node.previous || requestCmdList.count )
+			printf( "Found %d stale requestCmd nodes.\n", requestCmdList.count );
 		/* We just re-init link list instead of delete, because there is no resource issue */
 		ellInit( &requestQryList );
 		ellInit( &requestCmdList );
@@ -155,8 +156,21 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 		/*
 		 * First handle all requests in the command list
 		 */
-		if(requestCmdList.count)
-		{/* Send out all commands */
+		if ( requestCmdList.count == 0 )
+		{
+			/* No commands this time */
+			if ( pSnmpAgent->reqCmdPdu != NULL )
+			{
+				snmp_free_pdu( pSnmpAgent->reqCmdPdu );
+				pSnmpAgent->reqCmdPdu = NULL;
+				if(SNMP_DRV_DEBUG >= 2) printf("Snmp_Operation loop for agent[%s] freeing unused Cmd PDU.\n", pSnmpAgent->pActiveSession->peername);
+			}
+		}
+		else
+		{
+			/* Send out all commands */
+    		struct snmp_pdu * respCmdPdu	= NULL;
+
 			/* send command to the snmp agent */
 			status = snmp_sess_synch_response(pSnmpAgent->pSess, pSnmpAgent->reqCmdPdu, &respCmdPdu);
 			switch(status)
@@ -203,11 +217,11 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 								/* process record */
 								if(pRequest->pRecord)
 								{
-									if(SNMP_DRV_DEBUG > 1) printf("Got response for record [%s]=[%s]\n", pRequest->pRecord->name, pRequest->pValStr);
+									if(SNMP_DRV_DEBUG >= 3) printf("Got response for record [%s]=[%s]\n", pRequest->pRecord->name, pRequest->pValStr);
 									dbScanLock(pRequest->pRecord);
 									(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
 									dbScanUnlock(pRequest->pRecord);
-									if(SNMP_DRV_DEBUG > 1) printf("Record [%s] processed\n", pRequest->pRecord->name);
+									if(SNMP_DRV_DEBUG >= 4) printf("Record [%s] processed\n", pRequest->pRecord->name);
 								}
 
 								/* Remove the request from link list */
@@ -332,7 +346,9 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 					snmp_sess_perror(pSnmpAgent->pActiveSession->peername, pSnmpAgent->pActiveSession);
 					snmp_sess_error(pSnmpAgent->pSess, &liberr, &syserr, &errstr);
 
-					for(pRequest = (SNMP_REQUEST *)ellFirst(&requestCmdList); pRequest; pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
+					for(	pRequest = (SNMP_REQUEST *)ellFirst(&requestCmdList);
+							pRequest != NULL;
+							pRequest = (SNMP_REQUEST *)ellNext( (ELLNODE *) pRequest ))
 					{/* Go thru the request list to process all records */
 
 						 pRequest->errCode = SNMP_REQUEST_SNMP_ERR |(liberr?liberr:syserr); /* snmp error */
@@ -360,7 +376,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 			{
 				snmp_free_pdu(respCmdPdu);
 				respCmdPdu = NULL;
-				if(SNMP_DRV_DEBUG > 1) printf("Oper task for agent[%s] frees PDU!\n", pSnmpAgent->pActiveSession->peername);
+				if(SNMP_DRV_DEBUG >= 3) printf("Snmp_Operation loop for agent[%s] freeing PDU.\n", pSnmpAgent->pActiveSession->peername);
 			}
 
 		}/* Command PDU */
@@ -368,8 +384,21 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 		/*
 		 * Next handle all requests in the query list
 		 */
-		if(requestQryList.count)
-		{/* Read out and re-organize all requests */
+		if ( requestQryList.count == 0 )
+		{
+			/* No commands this time */
+			if ( pSnmpAgent->reqQryPdu != NULL )
+			{
+				snmp_free_pdu( pSnmpAgent->reqQryPdu );
+				pSnmpAgent->reqQryPdu = NULL;
+				if(SNMP_DRV_DEBUG >= 2) printf("Snmp_Operation loop for agent[%s] freeing unused Qry PDU.\n", pSnmpAgent->pActiveSession->peername);
+			}
+		}
+		else
+		{
+			/* Read out and re-organize all requests */
+    		struct snmp_pdu * respQryPdu	= NULL;
+
 			/* request the snmp agent */
 			status = snmp_sess_synch_response(pSnmpAgent->pSess, pSnmpAgent->reqQryPdu, &respQryPdu);
 			switch(status)
@@ -407,11 +436,11 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 								/* process record */
 								if(pRequest->pRecord)
 								{
-									if(SNMP_DRV_DEBUG > 1) printf("Got response for record [%s]=[%s]\n", pRequest->pRecord->name, pRequest->pValStr);
+									if(SNMP_DRV_DEBUG >= 3) printf("Got response for record [%s]=[%s]\n", pRequest->pRecord->name, pRequest->pValStr);
 									dbScanLock(pRequest->pRecord);
 									(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
 									dbScanUnlock(pRequest->pRecord);
-									if(SNMP_DRV_DEBUG > 1) printf("Record [%s] processed\n", pRequest->pRecord->name);
+									if(SNMP_DRV_DEBUG >= 4) printf("Record [%s] processed\n", pRequest->pRecord->name);
 								}
 
 								/* Remove the request from link list */
@@ -559,7 +588,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 			{
 				snmp_free_pdu(respQryPdu);
 				respQryPdu = NULL;
-				if(SNMP_DRV_DEBUG > 1) printf("Oper task for agent[%s] frees PDU!\n", pSnmpAgent->pActiveSession->peername);
+				if(SNMP_DRV_DEBUG >= 3) printf("Snmp_Operation loop for agent[%s] freeing PDU.\n", pSnmpAgent->pActiveSession->peername);
 			}
 
 		}	/* Query PDU */
@@ -576,11 +605,11 @@ int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion,
 {
     static int snmpInited = FALSE;
 
-    SNMP_AGENT   * pSnmpAgent;
+    SNMP_AGENT		*	pSnmpAgent;
 
-    SNMP_REQINFO * pSnmpReqInfo;
-    SNMP_REQPTR  * pSnmpReqPtr;
-    SNMP_REQUEST   * pSnmpRequest;
+    SNMP_REQINFO	*	pSnmpReqInfo;
+    SNMP_REQPTR		*	pSnmpReqPtr;
+    SNMP_REQUEST	*	pSnmpRequest;
 
     char peerName[81];
     char community[81];
@@ -627,7 +656,7 @@ int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion,
 	{
 		type	= typeFromIO;
 	}
-    if(SNMP_DRV_DEBUG) printf( "Query: Agent[%s], Community[%s], OIDStr[%s], Type %c\n", peerName, community, oidStr, type );
+    if(SNMP_DRV_DEBUG >= 2) printf( "\nsnmpRequestInit: Agent[%s], Community[%s], OIDStr[%s], Type %c\n", peerName, community, oidStr, type );
 
     /* Check if the agent is already in our list, or else add it */
     epicsMutexLock(snmpAgentListLock);
@@ -644,6 +673,7 @@ int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion,
 
     if(!pSnmpAgent)
     {/* Did not find any existing matching agent, create one */
+    	if(SNMP_DRV_DEBUG >= 1) printf( "\nsnmpRequestInit: Creating Agent[%s], Community[%s]\n", peerName, community );
         pSnmpAgent = callocMustSucceed(1, sizeof(SNMP_AGENT), "calloc buffer for SNMP_AGENT");
 
         pSnmpAgent->mutexLock = epicsMutexMustCreate();
@@ -668,7 +698,7 @@ int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion,
 
         /* In case we need to change the content of session */
         pSnmpAgent->pActiveSession = snmp_sess_session(pSnmpAgent->pSess);
-        if(SNMP_DRV_DEBUG) 
+        if(SNMP_DRV_DEBUG >= 2) 
         {
             char * ver_msg[5]={"Ver1", "Ver2c", "Ver2u", "V3", "Unknown"};
             printf("Active SNMP agent: %s,", pSnmpAgent->pActiveSession->peername);
@@ -678,6 +708,7 @@ int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion,
 
         ellInit(&(pSnmpAgent->snmpReqPtrList));
 
+		/* Does this pre-alloc all SNMP_REQUEST objects? */
         pSnmpAgent->msgQ_id = epicsMessageQueueCreate(OPTHREAD_MSGQ_CAPACITY, sizeof(SNMP_REQUEST *));
         if(pSnmpAgent->msgQ_id == NULL)
         {
@@ -709,12 +740,13 @@ int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion,
         /* We successfully allocate all resource */
         ellAdd( &snmpAgentList, (ELLNODE *)pSnmpAgent);
 
-        if(SNMP_DRV_DEBUG) printf("Add snmp agent %s\n", peerName);
+        if(SNMP_DRV_DEBUG >= 2) printf("Adding snmp agent %s to snmpAgentList\n", peerName);
     }
     epicsMutexUnlock(snmpAgentListLock);
     /* Check if the agent is already in our list, or else add it */
 
     /* Query info prepare */
+	if(SNMP_DRV_DEBUG >= 2) printf("Alloc pSnmpReqInfo for %s\n", pRecord->name );
     pSnmpReqInfo = (SNMP_REQINFO *)callocMustSucceed(1, sizeof(SNMP_REQINFO), "calloc SNMP_REQINFO");
 
     pSnmpReqPtr = &(pSnmpReqInfo->reqptr);
@@ -732,9 +764,13 @@ int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion,
     pSnmpRequest->objectId.requestName = epicsStrDup(oidStr);
     pSnmpRequest->objectId.requestOidLen = MAX_OID_LEN;
 
-    if (!get_node(pSnmpRequest->objectId.requestName, pSnmpRequest->objectId.requestOid, &pSnmpRequest->objectId.requestOidLen))
+    if ( !get_node(	pSnmpRequest->objectId.requestName,
+					pSnmpRequest->objectId.requestOid,
+					&pSnmpRequest->objectId.requestOidLen ) )
     {/* Search traditional MIB2 and find nothing */
-        if (!read_objid(pSnmpRequest->objectId.requestName, pSnmpRequest->objectId.requestOid, &pSnmpRequest->objectId.requestOidLen))
+        if ( !read_objid(	pSnmpRequest->objectId.requestName,
+							pSnmpRequest->objectId.requestOid,
+							&pSnmpRequest->objectId.requestOidLen ) )
         {
             snmp_perror("Parsing objectId"); /* parsing error has nothing to do with session */
             errlogPrintf("Fail to parse the objectId %s.\n", oidStr);
@@ -746,6 +782,7 @@ int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion,
     }
 
     /* Set when we get response */
+	if(SNMP_DRV_DEBUG >= 2) printf("Alloc pValStr for %s\n", pRecord->name );
     pSnmpRequest->valStrLen = MAX(valStrLen, MAX_CA_STRING_SIZE);
     pSnmpRequest->pValStr = (char *)callocMustSucceed(1, pSnmpRequest->valStrLen, "calloc pValStr");
 
@@ -767,7 +804,7 @@ int snmpQuerySingleVar(SNMP_REQUEST * pRequest)
     int     status, rtn;
 
     struct snmp_pdu * reqQryPdu;
-    struct snmp_pdu * respQryPdu;
+	struct snmp_pdu * respQryPdu	= NULL;
 
     struct variable_list *pVar;
     char pBuf[1024];
@@ -796,7 +833,13 @@ int snmpQuerySingleVar(SNMP_REQUEST * pRequest)
         return -1;
     }
 
-    /* request the snmp agent */
+    /*
+	 * Request the snmp agent
+	 * The query pdu will be freed via snmp_sess_synch_repsonse()
+	 * for both error and success.
+	 * If a reqponse pdu is created, a pointer to it will be returned in respQryPdu.
+	 * That response pdu must be freed before we return.
+	 */
     status = snmp_sess_synch_response(pRequest->pSnmpAgent->pSess, reqQryPdu, &respQryPdu);
     switch(status)
     {

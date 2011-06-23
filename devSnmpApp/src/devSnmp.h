@@ -90,6 +90,9 @@ extern "C" {
 #define NO_CONVERT              (2)
 #define MAX_CA_STRING_SIZE      (40)
 
+#define	TY_REQ_QUERY			0
+#define	TY_REQ_COMMAND			1
+
 /* hostname, community name and snmp version define a unique agent */
 typedef struct SNMP_AGENT
 {
@@ -126,7 +129,7 @@ typedef struct SNMP_REQUEST
 {
     ELLNODE		node;	/* Link List Node */
 
-    int                 cmd;	/* 0: query; 1: command */
+    int                 cmd;	/* TY_REQ_QUERY, TY_REQ_COMMAND */
     char                type;	/* i: INTEGER, u: unsigned INTEGER, t: TIMETICKS, a: IPADDRESS */
     				/* o: OBJID, s: STRING, x: HEX STRING, d: DECIMAL STRING, b: BITS */
     				/* U: unsigned int64, I: signed int64, F: float, D: double */
