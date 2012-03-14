@@ -10,6 +10,7 @@ device(	waveform,	INST_IO,	devWfSnmpV1,	"SnmpV1"	)
 device(	ao,			INST_IO,	devAoSnmpV1,	"SnmpV1"	)
 device(	longout,	INST_IO,	devLoSnmpV1,	"SnmpV1"	)
 device(	stringout,	INST_IO,	devSoSnmpV1,	"SnmpV1"	)
+device(	bo,		INST_IO,	devBoSnmpV1,	"SnmpV1"	)
 
 device(	ai,			INST_IO,	devAiSnmpV2c,	"SnmpV2c"	)
 device(	mbbi,		INST_IO,	devMbbiSnmpV2c,	"SnmpV2c"	)
@@ -21,6 +22,7 @@ device(	waveform,	INST_IO,	devWfSnmpV2c,	"SnmpV2c"	)
 device(	ao,			INST_IO,	devAoSnmpV2c,	"SnmpV2c"	)
 device(	longout,	INST_IO,	devLoSnmpV2c,	"SnmpV2c"	)
 device(	stringout,	INST_IO,	devSoSnmpV2c,	"SnmpV2c"	)
+device(	bo,		INST_IO,	devBoSnmpV2c,	"SnmpV2c"	)
 
 device(	ai,			INST_IO,	devAiSnmpV2c,	"Snmp"	)
 device(	mbbi,		INST_IO,	devMbbiSnmpV2c,	"Snmp"	)
@@ -32,6 +34,7 @@ device(	waveform,	INST_IO,	devWfSnmpV2c,	"Snmp"	)
 device(	ao,			INST_IO,	devAoSnmpV2c,	"Snmp"	)
 device(	longout,	INST_IO,	devLoSnmpV2c,	"Snmp"	)
 device(	stringout,	INST_IO,	devSoSnmpV2c,	"Snmp"	)
+device(	bo,		INST_IO,	devBoSnmpV2c,	"SnmpV2c"	)
 
 driver(	drvSnmp	)
 

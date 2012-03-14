@@ -41,6 +41,11 @@ static long init_bi_snmpV1(struct biRecord *pbi);
 static long init_bi_snmpV2c(struct biRecord *pbi);
 static long read_bi_snmp(struct biRecord *pbi);
 
+static long init_bo_snmp(struct boRecord *pbi, long snmpVersion);
+static long init_bo_snmpV1(struct boRecord *pbi);
+static long init_bo_snmpV2c(struct boRecord *pbi);
+static long write_bo_snmp(struct boRecord *pbi);
+
 static long init_lo_snmp(struct longoutRecord *plo, long snmpVersion);
 static long init_lo_snmpV1(struct longoutRecord *plo);
 static long init_lo_snmpV2c(struct longoutRecord *plo);
@@ -77,6 +82,7 @@ SNMP_DEV_SUP_SET devAoSnmpV1 = {6, NULL, NULL, init_ao_snmpV1,  NULL, write_ao_s
 SNMP_DEV_SUP_SET devLiSnmpV1 = {6, NULL, NULL, init_li_snmpV1,  NULL, read_li_snmp, NULL};
 SNMP_DEV_SUP_SET devMbbiSnmpV1={6, NULL, NULL, init_mbbi_snmpV1,  NULL, read_mbbi_snmp, NULL};
 SNMP_DEV_SUP_SET devBiSnmpV1 = {6, NULL, NULL, init_bi_snmpV1,  NULL, read_bi_snmp, NULL};
+SNMP_DEV_SUP_SET devBoSnmpV1 = {6, NULL, NULL, init_bo_snmpV1,  NULL, write_bo_snmp, NULL};
 SNMP_DEV_SUP_SET devLoSnmpV1 = {6, NULL, NULL, init_lo_snmpV1,  NULL, write_lo_snmp, NULL};
 SNMP_DEV_SUP_SET devSiSnmpV1 = {6, NULL, NULL, init_si_snmpV1,  NULL, read_si_snmp, NULL};
 SNMP_DEV_SUP_SET devSoSnmpV1 = {6, NULL, NULL, init_so_snmpV1,  NULL, write_so_snmp, NULL};
@@ -87,6 +93,7 @@ SNMP_DEV_SUP_SET devAoSnmpV2c = {6, NULL, NULL, init_ao_snmpV2c,  NULL, write_ao
 SNMP_DEV_SUP_SET devLiSnmpV2c = {6, NULL, NULL, init_li_snmpV2c,  NULL, read_li_snmp, NULL};
 SNMP_DEV_SUP_SET devMbbiSnmpV2c={6, NULL, NULL, init_mbbi_snmpV2c,  NULL, read_mbbi_snmp, NULL};
 SNMP_DEV_SUP_SET devBiSnmpV2c={6, NULL, NULL, init_bi_snmpV2c,  NULL, read_bi_snmp, NULL};
+SNMP_DEV_SUP_SET devBoSnmpV2c={6, NULL, NULL, init_bo_snmpV2c,  NULL, write_bo_snmp, NULL};
 SNMP_DEV_SUP_SET devLoSnmpV2c = {6, NULL, NULL, init_lo_snmpV2c,  NULL, write_lo_snmp, NULL};
 SNMP_DEV_SUP_SET devSiSnmpV2c = {6, NULL, NULL, init_si_snmpV2c,  NULL, read_si_snmp, NULL};
 SNMP_DEV_SUP_SET devSoSnmpV2c = {6, NULL, NULL, init_so_snmpV2c,  NULL, write_so_snmp, NULL};
@@ -98,6 +105,7 @@ epicsExportAddress(dset, devAoSnmpV1);
 epicsExportAddress(dset, devLiSnmpV1);
 epicsExportAddress(dset, devMbbiSnmpV1);
 epicsExportAddress(dset, devBiSnmpV1);
+epicsExportAddress(dset, devBoSnmpV1);
 epicsExportAddress(dset, devLoSnmpV1);
 epicsExportAddress(dset, devSiSnmpV1);
 epicsExportAddress(dset, devSoSnmpV1);
@@ -108,6 +116,7 @@ epicsExportAddress(dset, devAoSnmpV2c);
 epicsExportAddress(dset, devLiSnmpV2c);
 epicsExportAddress(dset, devMbbiSnmpV2c);
 epicsExportAddress(dset, devBiSnmpV2c);
+epicsExportAddress(dset, devBoSnmpV2c);
 epicsExportAddress(dset, devLoSnmpV2c);
 epicsExportAddress(dset, devSiSnmpV2c);
 epicsExportAddress(dset, devSoSnmpV2c);
@@ -688,6 +697,106 @@ static long write_lo_snmp(struct longoutRecord *plo)
         {
             recGblSetSevr(plo, WRITE_ALARM, INVALID_ALARM);
             errlogPrintf("write_lo_snmp: epicsMessageQueueTrySend Error [%s]\n", plo->name);
+            return -1;
+        }
+        else
+        {
+            plo->pact = TRUE;
+        }
+
+    }/* pre-process */
+    else
+    {/* post-process */
+        if( (!pRequest->opDone) || pRequest->errCode )
+        {
+            recGblSetSevr(plo, WRITE_ALARM, INVALID_ALARM);
+            errlogPrintf("Record [%s] received error code [0x%08x]!\n", plo->name, pRequest->errCode);
+            return -1;
+        }
+    }/* post-process */
+
+    return 0;
+}
+
+static long init_bo_snmp(struct boRecord *plo, long snmpVersion)
+{
+    int status = 0;
+    SNMP_REQUEST  *pRequest;
+    char *pValStr;
+    unsigned int u32temp;
+
+    /* bout.out must be INST_IO */
+    if(plo->out.type != INST_IO)
+    {
+        recGblRecordError(S_db_badField,(void *)plo, "devLoSnmp (init_record) Illegal INP field");
+        plo->pact = TRUE;
+        return(S_db_badField);
+    }
+
+    status = snmpRequestInit((dbCommon *)plo, plo->out.value.instio.string, snmpVersion, MAX_CA_STRING_SIZE, 1, 'i');
+
+    if (status)
+    {
+        recGblRecordError(S_db_badField, (void *)plo,"devLoSnmp (init_record) bad parameters");
+        plo->pact = TRUE;
+        return(S_db_badField);
+    }
+
+    pRequest = (SNMP_REQUEST *)(plo->dpvt);
+    if(0 == snmpQuerySingleVar(pRequest))
+    {
+        if(SNMP_DEV_DEBUG)   printf("Record [%s] received string [%s] during init.\n", plo->name, pRequest->pValStr);
+        pValStr = strrchr(pRequest->pValStr, ':');
+        if(pValStr == NULL) pValStr = pRequest->pValStr;
+        else pValStr++;
+
+        /* skip non-digit, particularly because of WIENER crate has ON(1), OFF(0) */
+        for (; isdigit(*pValStr) == 0 && *pValStr != '\0'; ) ++pValStr;
+        /* The bout record for snmp only handles unsigned int */
+        if (pValStr && sscanf(pValStr, "%u", &u32temp))
+        {
+            plo->val = u32temp&0x7FFFFFFF;	/* Get rid of MSB since plo->val is signed */
+	    /*            plo->val = u32temp&0x00000001;*/	/* keep only loweest bit */
+            plo->udf = FALSE;
+            plo->stat=plo->sevr=NO_ALARM;
+        }
+        else
+        {
+            errlogPrintf("Record [%s] parsing response [%s] error!\n", plo->name, pValStr);
+        }
+    }
+    return 0;
+}
+
+static long init_bo_snmpV1(struct boRecord *plo)
+{
+    return init_bo_snmp(plo, SNMP_VERSION_1);
+}
+
+static long init_bo_snmpV2c(struct boRecord *plo)
+{
+    return init_bo_snmp(plo, SNMP_VERSION_2c);
+}
+
+static long write_bo_snmp(struct boRecord *plo)
+{
+    SNMP_REQUEST  *pRequest = (SNMP_REQUEST *)(plo->dpvt);
+
+    if(!pRequest) return(-1);
+
+    if(!plo->pact)
+    {/* pre-process */
+        /* Clean up the request */
+        pRequest->errCode = SNMP_REQUEST_NO_ERR;
+        pRequest->opDone = 0;
+        /* Give the value */
+        /* sprintf(pRequest->pValStr, "%*d", MAX_CA_STRING_SIZE-1, plo->val); */
+        sprintf(pRequest->pValStr, "%d", plo->val);
+
+        if(epicsMessageQueueTrySend(pRequest->pSnmpAgent->msgQ_id, (void *)&pRequest, sizeof(SNMP_REQUEST *)) == -1)
+        {
+            recGblSetSevr(plo, WRITE_ALARM, INVALID_ALARM);
+            errlogPrintf("write_bo_snmp: epicsMessageQueueTrySend Error [%s]\n", plo->name);
             return -1;
         }
         else

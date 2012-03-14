@@ -51,6 +51,7 @@
 #include <aoRecord.h>
 #include <mbbiRecord.h>
 #include <biRecord.h>
+#include <boRecord.h>
 #include <stringinRecord.h>
 #include <stringoutRecord.h>
 #include <longinRecord.h>
