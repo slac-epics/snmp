@@ -12,8 +12,11 @@
 \***************************************************************************/
 
 #include "devSnmp.h"
+#include "epicsExport.h"
 
 int SNMP_DEV_DEBUG = 0;
+
+epicsExportAddress( int, SNMP_DEV_DEBUG );
 
 /* function prototypes */
 static long init_ai_snmp(struct aiRecord *pai, long snmpVersion);
@@ -349,7 +352,7 @@ static long read_li_snmp(struct longinRecord *pli)
     SNMP_REQUEST  *pRequest = (SNMP_REQUEST *)(pli->dpvt);
     int rtn = -1;
     char *pValStr;
-    unsigned int u32temp;
+    int i32temp	= -1;
 
     if(!pRequest) return(-1);
 
@@ -392,15 +395,16 @@ static long read_li_snmp(struct longinRecord *pli)
             for (; isdigit(*pValStr) == 0 && *pValStr != '\0'; )
 				++pValStr;
 
-            /* The longin record for snmp only handles unsigned int */
-            if (pValStr && sscanf(pValStr, "%u", &u32temp))
+            /* Scan for an integer */
+            if (pValStr && sscanf(pValStr, "%d", &i32temp))
             {
-                pli->val = u32temp&0x7FFFFFFF;	/* Get rid of MSB since pli->val is signed */
+                pli->val = i32temp;
                 pli->udf = FALSE;
 				rtn = 0;
 			}
             else
             {
+                pli->val = -1;
                 recGblSetSevr(pli, READ_ALARM, INVALID_ALARM);
                 errlogPrintf("Record [%s] parsing response [%s] error!\n", pli->name, pValStr);
 				rtn = -1;
@@ -447,10 +451,10 @@ static long init_mbbi_snmpV2c(struct mbbiRecord *pmbbi)
 
 static long read_mbbi_snmp(struct mbbiRecord *pmbbi)
 {
-    SNMP_REQUEST  *pRequest = (SNMP_REQUEST *)(pmbbi->dpvt);
-    int rtn = -1;
-    char *pValStr;
-    unsigned int u32temp;
+    SNMP_REQUEST	*	pRequest	= (SNMP_REQUEST *)(pmbbi->dpvt);
+    int					rtn 		= -1;
+    char			*	pValStr;
+    int					i32temp		= -1;
 
     if(!pRequest) return(-1);
 
@@ -468,6 +472,8 @@ static long read_mbbi_snmp(struct mbbiRecord *pmbbi)
         }
         else
         {
+			if ( pmbbi->tpro )
+				printf( "read_mbbi_snmp [%s]: Val %d, Sent req, set pact TRUE\n", pmbbi->name, pmbbi->val );
             pmbbi->pact = TRUE;
             rtn = 0;
         }
@@ -484,6 +490,8 @@ static long read_mbbi_snmp(struct mbbiRecord *pmbbi)
         }
         else
         {
+			if ( pmbbi->tpro )
+				printf( "read_mbbi_snmp [%s]: Val %d, received string [%s]\n", pmbbi->name, pmbbi->val, pRequest->pValStr );
             if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] received string [%s]\n", pmbbi->name, pRequest->pValStr);
 
             pValStr = strrchr(pRequest->pValStr, ':');
@@ -496,15 +504,16 @@ static long read_mbbi_snmp(struct mbbiRecord *pmbbi)
             for (; isdigit(*pValStr) == 0 && *pValStr != '\0'; )
 				++pValStr;
 
-            /* The mbbi record for snmp only handles unsigned int */
-            if ( pValStr && sscanf( pValStr, "%u", &u32temp ) )
+            /* Scan for an integer */
+            if ( pValStr && sscanf( pValStr, "%d", &i32temp ) )
             {
-                pmbbi->rval	= u32temp & 0x7FFFFFFF;	/* Get rid of MSB since pmbbi->val is signed */
-                /* pmbbi->udf	= FALSE; */
+                pmbbi->rval	= i32temp;
+                pmbbi->udf	= FALSE;
 				rtn = 0;
 			}
             else
             {
+                pmbbi->rval	= -1;
                 recGblSetSevr(pmbbi, READ_ALARM, INVALID_ALARM);
                 errlogPrintf("Record [%s] parsing response [%s] error!\n", pmbbi->name, pValStr);
 				rtn = -1;
@@ -603,7 +612,7 @@ static long read_bi_snmp(struct biRecord *pbi)
             /* The bi record for snmp only handles unsigned int */
             if ( pValStr && sscanf( pValStr, "%u", &u32temp ) )
             {
-                pbi->rval	= u32temp & 0x7FFFFFFF;	/* Get rid of MSB since pbi->val is signed */
+                pbi->rval	= u32temp;
                 /* pbi->udf	= FALSE; */
 				rtn = 0;
 			}
@@ -624,7 +633,7 @@ static long init_lo_snmp(struct longoutRecord *plo, long snmpVersion)
     int status = 0;
     SNMP_REQUEST  *pRequest;
     char *pValStr;
-    unsigned int u32temp;
+    int i32temp;
 
     /* longout.out must be INST_IO */
     if(plo->out.type != INST_IO)
@@ -652,16 +661,17 @@ static long init_lo_snmp(struct longoutRecord *plo, long snmpVersion)
         else pValStr++;
 
         /* skip non-digit, particularly because of WIENER crate has ON(1), OFF(0) */
-        for (; isdigit(*pValStr) == 0 && *pValStr != '\0'; ) ++pValStr;
-        /* The longout record for snmp only handles unsigned int */
-        if (pValStr && sscanf(pValStr, "%u", &u32temp))
+        for (; isdigit(*pValStr) == 0 && *pValStr != '-' && *pValStr != '\0'; ) ++pValStr;
+        /* Scan for an integer */
+        if (pValStr && sscanf(pValStr, "%d", &i32temp))
         {
-            plo->val = u32temp&0x7FFFFFFF;	/* Get rid of MSB since plo->val is signed */
+            plo->val = i32temp;
             plo->udf = FALSE;
             plo->stat=plo->sevr=NO_ALARM;
         }
         else
         {
+            plo->val = -1;
             errlogPrintf("Record [%s] parsing response [%s] error!\n", plo->name, pValStr);
         }
     }
@@ -728,7 +738,7 @@ static long init_bo_snmp(struct boRecord *plo, long snmpVersion)
     /* bout.out must be INST_IO */
     if(plo->out.type != INST_IO)
     {
-        recGblRecordError(S_db_badField,(void *)plo, "devLoSnmp (init_record) Illegal INP field");
+        recGblRecordError(S_db_badField,(void *)plo, "devBoSnmp (init_record) Illegal INP field");
         plo->pact = TRUE;
         return(S_db_badField);
     }
@@ -737,7 +747,7 @@ static long init_bo_snmp(struct boRecord *plo, long snmpVersion)
 
     if (status)
     {
-        recGblRecordError(S_db_badField, (void *)plo,"devLoSnmp (init_record) bad parameters");
+        recGblRecordError(S_db_badField, (void *)plo,"devBoSnmp (init_record) bad parameters");
         plo->pact = TRUE;
         return(S_db_badField);
     }
@@ -755,13 +765,13 @@ static long init_bo_snmp(struct boRecord *plo, long snmpVersion)
         /* The bout record for snmp only handles unsigned int */
         if (pValStr && sscanf(pValStr, "%u", &u32temp))
         {
-            plo->val = u32temp&0x7FFFFFFF;	/* Get rid of MSB since plo->val is signed */
-	    /*            plo->val = u32temp&0x00000001;*/	/* keep only loweest bit */
+            plo->val = u32temp;
             plo->udf = FALSE;
             plo->stat=plo->sevr=NO_ALARM;
         }
         else
         {
+            plo->val = 0;
             errlogPrintf("Record [%s] parsing response [%s] error!\n", plo->name, pValStr);
         }
     }

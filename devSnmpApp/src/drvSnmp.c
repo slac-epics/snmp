@@ -66,9 +66,9 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 		if(SNMP_DRV_DEBUG >= 2) printf("Snmp_Operation loop for agent[%s] processing %d requests\n", pSnmpAgent->pActiveSession->peername, NofReqs + 1 );
 
 		if ( requestQryList.node.next || requestQryList.node.previous || requestQryList.count )
-			printf( "Found %d stale requestQry nodes.?\n", requestQryList.count );
+			errlogPrintf( "Found %d stale requestQry nodes.?\n", requestQryList.count );
 		if ( requestCmdList.node.next || requestCmdList.node.previous || requestCmdList.count )
-			printf( "Found %d stale requestCmd nodes.\n", requestCmdList.count );
+			errlogPrintf( "Found %d stale requestCmd nodes.\n", requestCmdList.count );
 		/* We just re-init link list instead of delete, because there is no resource issue */
 		ellInit( &requestQryList );
 		ellInit( &requestCmdList );
