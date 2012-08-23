@@ -333,10 +333,13 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 							dbScanLock(pRequest->pRecord);
 							(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
 							dbScanUnlock(pRequest->pRecord);
+							errlogPrintf(	"%s: Snmp CmdList Timeout on %s\n",
+											pRequest->pSnmpAgent->pActiveSession->peername,
+											pRequest->pRecord->name	);
 						}
 					}
 
-					errlogPrintf("%s: Snmp Query Timeout\n", pSnmpAgent->pActiveSession->peername);
+					/* errlogPrintf("%s: Snmp Query Timeout\n", pSnmpAgent->pActiveSession->peername); */
 					break;
 				case STAT_ERROR:
 				default:
@@ -547,10 +550,13 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 							dbScanLock(pRequest->pRecord);
 							(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
 							dbScanUnlock(pRequest->pRecord);
+							errlogPrintf(	"%s: Snmp QryList Timeout on %s\n",
+											pRequest->pSnmpAgent->pActiveSession->peername,
+											pRequest->pRecord->name	);
 						}
 					}
 
-					errlogPrintf("%s: Snmp Query Timeout\n", pSnmpAgent->pActiveSession->peername);
+					/* errlogPrintf("%s: Snmp Query Timeout\n", pSnmpAgent->pActiveSession->peername); */
 					break;
 				case STAT_ERROR:
 				default:
@@ -773,7 +779,7 @@ int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion,
 							&pSnmpRequest->objectId.requestOidLen ) )
         {
             snmp_perror("Parsing objectId"); /* parsing error has nothing to do with session */
-            errlogPrintf("Fail to parse the objectId %s.\n", oidStr);
+            errlogPrintf("Failed to parse the objectId %s.\n", oidStr);
             pRecord->dpvt = NULL;
             free(pSnmpRequest->objectId.requestName);
             free(pSnmpReqInfo);
@@ -909,7 +915,9 @@ int snmpQuerySingleVar(SNMP_REQUEST * pRequest)
             break;
 
         case STAT_TIMEOUT:
-            errlogPrintf("%s: Snmp Query Timeout\n", pRequest->pSnmpAgent->pActiveSession->peername);
+            errlogPrintf(	"%s: Snmp QuerySingleVar Timeout on %s\n",
+							pRequest->pSnmpAgent->pActiveSession->peername,
+							pRequest->pRecord->name	);
             rtn = -1;
             break;
 

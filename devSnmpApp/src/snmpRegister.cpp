@@ -92,7 +92,17 @@ int write_mib_tree( const char * pszFileName )
 		return -1;
 	}
 
+	// Print the mib
 	print_mib( pFile );
+
+	// Set options for the oid report
+//	print_oid_report_enable_oid();			// .1.3.6.1.4.1.1718.3.2.3.1.19
+//	print_oid_report_enable_symbolic();		// .iso.org.dod.internet.private.enterprises.serverTech...
+	print_oid_report_enable_labeledoid();	// .iso(1).org(3).dod(6)...
+	print_oid_report_enable_mibchildoid();	// "outletWakeupState"	"1.3.6.1.4.1.1718.3.2.3.1.19"
+	print_oid_report_enable_suffix();		// 	outletWakeupState(19) type=3
+
+	// Print the report
 	print_oid_report( pFile );
 	fclose( pFile );
 	return 0;
