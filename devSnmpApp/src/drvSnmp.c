@@ -63,7 +63,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 		NofReqs = MIN( (NofReqs + 1), (MAX(1, snmpMaxVarsPerMsg)) ) - 1;
  
         /* some requests come in */
-		if(SNMP_DRV_DEBUG >= 2) printf("Snmp_Operation loop for agent[%s] processing %d requests\n", pSnmpAgent->pActiveSession->peername, NofReqs + 1 );
+		if(SNMP_DRV_DEBUG >= 4) printf("Snmp_Operation loop for agent[%s] processing %d requests\n", pSnmpAgent->pActiveSession->peername, NofReqs + 1 );
 
 		if ( requestQryList.node.next || requestQryList.node.previous || requestQryList.count )
 			errlogPrintf( "Found %d stale requestQry nodes.?\n", requestQryList.count );
@@ -163,7 +163,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 			{
 				snmp_free_pdu( pSnmpAgent->reqCmdPdu );
 				pSnmpAgent->reqCmdPdu = NULL;
-				if(SNMP_DRV_DEBUG >= 2) printf("Snmp_Operation loop for agent[%s] freeing unused Cmd PDU.\n", pSnmpAgent->pActiveSession->peername);
+				if(SNMP_DRV_DEBUG >= 5) printf("Snmp_Operation loop for agent[%s] freeing unused Cmd PDU.\n", pSnmpAgent->pActiveSession->peername);
 			}
 		}
 		else
@@ -193,7 +193,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 							if(pRequest)
 							{
 								/*
-								 *	Found the matched request
+								 *	Found the matched request for this cmd
 								 *	snprint_value converts the value into a text string.
 								 *	If the buffer is not big enough, it might return -1
 								 *	and only put data type in.
@@ -214,14 +214,14 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 								}
 								pRequest->opDone = 1;
 
-								/* process record */
+								/* process cmd record */
 								if(pRequest->pRecord)
 								{
-									if(SNMP_DRV_DEBUG >= 3) printf("Got response for record [%s]=[%s]\n", pRequest->pRecord->name, pRequest->pValStr);
+									if(SNMP_DRV_DEBUG >= 2) printf("Got response for record [%s]=[%s]\n", pRequest->pRecord->name, pRequest->pValStr);
 									dbScanLock(pRequest->pRecord);
 									(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
 									dbScanUnlock(pRequest->pRecord);
-									if(SNMP_DRV_DEBUG >= 4) printf("Record [%s] processed\n", pRequest->pRecord->name);
+									if(SNMP_DRV_DEBUG >= 5) printf("Record [%s] processed\n", pRequest->pRecord->name);
 								}
 
 								/* Remove the request from link list */
@@ -379,7 +379,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 			{
 				snmp_free_pdu(respCmdPdu);
 				respCmdPdu = NULL;
-				if(SNMP_DRV_DEBUG >= 3) printf("Snmp_Operation loop for agent[%s] freeing PDU.\n", pSnmpAgent->pActiveSession->peername);
+				if(SNMP_DRV_DEBUG >= 5) printf("Snmp_Operation loop for agent[%s] freeing PDU.\n", pSnmpAgent->pActiveSession->peername);
 			}
 
 		}/* Command PDU */
@@ -394,7 +394,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 			{
 				snmp_free_pdu( pSnmpAgent->reqQryPdu );
 				pSnmpAgent->reqQryPdu = NULL;
-				if(SNMP_DRV_DEBUG >= 2) printf("Snmp_Operation loop for agent[%s] freeing unused Qry PDU.\n", pSnmpAgent->pActiveSession->peername);
+				if(SNMP_DRV_DEBUG >= 5) printf("Snmp_Operation loop for agent[%s] freeing unused Qry PDU.\n", pSnmpAgent->pActiveSession->peername);
 			}
 		}
 		else
@@ -418,7 +418,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 							}
 
 							if(pRequest)
-							{/* Found the matched request */
+							{/* Found the matched query request */
 								/* snprint_value converts the value into a text string. If the buffer is not big enough, it might return -1 and only  */
 								/* put data type in. So we use a large temp buffer here.                                                              */
 								int cvtSts;
@@ -436,14 +436,14 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 								}
 								pRequest->opDone = 1;
 
-								/* process record */
+								/* process query record */
 								if(pRequest->pRecord)
 								{
 									if(SNMP_DRV_DEBUG >= 3) printf("Got response for record [%s]=[%s]\n", pRequest->pRecord->name, pRequest->pValStr);
 									dbScanLock(pRequest->pRecord);
 									(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
 									dbScanUnlock(pRequest->pRecord);
-									if(SNMP_DRV_DEBUG >= 4) printf("Record [%s] processed\n", pRequest->pRecord->name);
+									if(SNMP_DRV_DEBUG >= 5) printf("Record [%s] processed\n", pRequest->pRecord->name);
 								}
 
 								/* Remove the request from link list */
@@ -594,7 +594,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 			{
 				snmp_free_pdu(respQryPdu);
 				respQryPdu = NULL;
-				if(SNMP_DRV_DEBUG >= 3) printf("Snmp_Operation loop for agent[%s] freeing PDU.\n", pSnmpAgent->pActiveSession->peername);
+				if(SNMP_DRV_DEBUG >= 5) printf("Snmp_Operation loop for agent[%s] freeing PDU.\n", pSnmpAgent->pActiveSession->peername);
 			}
 
 		}	/* Query PDU */

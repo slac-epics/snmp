@@ -39,6 +39,11 @@ static long init_mbbi_snmpV1(struct mbbiRecord *pmbbi);
 static long init_mbbi_snmpV2c(struct mbbiRecord *pmbbi);
 static long read_mbbi_snmp(struct mbbiRecord *pmbbi);
 
+static long init_mbbo_snmp(struct mbboRecord *pmbbo, long snmpVersion);
+static long init_mbbo_snmpV1(struct mbboRecord *pmbbo);
+static long init_mbbo_snmpV2c(struct mbboRecord *pmbbo);
+static long write_mbbo_snmp(struct mbboRecord *pmbbo);
+
 static long init_bi_snmp(struct biRecord *pbi, long snmpVersion);
 static long init_bi_snmpV1(struct biRecord *pbi);
 static long init_bi_snmpV2c(struct biRecord *pbi);
@@ -84,6 +89,7 @@ SNMP_DEV_SUP_SET devAiSnmpV1 = {6, NULL, NULL, init_ai_snmpV1,  NULL, read_ai_sn
 SNMP_DEV_SUP_SET devAoSnmpV1 = {6, NULL, NULL, init_ao_snmpV1,  NULL, write_ao_snmp, NULL};
 SNMP_DEV_SUP_SET devLiSnmpV1 = {6, NULL, NULL, init_li_snmpV1,  NULL, read_li_snmp, NULL};
 SNMP_DEV_SUP_SET devMbbiSnmpV1={6, NULL, NULL, init_mbbi_snmpV1,  NULL, read_mbbi_snmp, NULL};
+SNMP_DEV_SUP_SET devMbboSnmpV1={6, NULL, NULL, init_mbbo_snmpV1,  NULL, write_mbbo_snmp, NULL};
 SNMP_DEV_SUP_SET devBiSnmpV1 = {6, NULL, NULL, init_bi_snmpV1,  NULL, read_bi_snmp, NULL};
 SNMP_DEV_SUP_SET devBoSnmpV1 = {6, NULL, NULL, init_bo_snmpV1,  NULL, write_bo_snmp, NULL};
 SNMP_DEV_SUP_SET devLoSnmpV1 = {6, NULL, NULL, init_lo_snmpV1,  NULL, write_lo_snmp, NULL};
@@ -95,6 +101,7 @@ SNMP_DEV_SUP_SET devAiSnmpV2c = {6, NULL, NULL, init_ai_snmpV2c,  NULL, read_ai_
 SNMP_DEV_SUP_SET devAoSnmpV2c = {6, NULL, NULL, init_ao_snmpV2c,  NULL, write_ao_snmp, NULL};
 SNMP_DEV_SUP_SET devLiSnmpV2c = {6, NULL, NULL, init_li_snmpV2c,  NULL, read_li_snmp, NULL};
 SNMP_DEV_SUP_SET devMbbiSnmpV2c={6, NULL, NULL, init_mbbi_snmpV2c,  NULL, read_mbbi_snmp, NULL};
+SNMP_DEV_SUP_SET devMbboSnmpV2c={6, NULL, NULL, init_mbbo_snmpV2c,  NULL, write_mbbo_snmp, NULL};
 SNMP_DEV_SUP_SET devBiSnmpV2c={6, NULL, NULL, init_bi_snmpV2c,  NULL, read_bi_snmp, NULL};
 SNMP_DEV_SUP_SET devBoSnmpV2c={6, NULL, NULL, init_bo_snmpV2c,  NULL, write_bo_snmp, NULL};
 SNMP_DEV_SUP_SET devLoSnmpV2c = {6, NULL, NULL, init_lo_snmpV2c,  NULL, write_lo_snmp, NULL};
@@ -107,6 +114,7 @@ epicsExportAddress(dset, devAiSnmpV1);
 epicsExportAddress(dset, devAoSnmpV1);
 epicsExportAddress(dset, devLiSnmpV1);
 epicsExportAddress(dset, devMbbiSnmpV1);
+epicsExportAddress(dset, devMbboSnmpV1);
 epicsExportAddress(dset, devBiSnmpV1);
 epicsExportAddress(dset, devBoSnmpV1);
 epicsExportAddress(dset, devLoSnmpV1);
@@ -118,6 +126,7 @@ epicsExportAddress(dset, devAiSnmpV2c);
 epicsExportAddress(dset, devAoSnmpV2c);
 epicsExportAddress(dset, devLiSnmpV2c);
 epicsExportAddress(dset, devMbbiSnmpV2c);
+epicsExportAddress(dset, devMbboSnmpV2c);
 epicsExportAddress(dset, devBiSnmpV2c);
 epicsExportAddress(dset, devBoSnmpV2c);
 epicsExportAddress(dset, devLoSnmpV2c);
@@ -522,6 +531,107 @@ static long read_mbbi_snmp(struct mbbiRecord *pmbbi)
     }	/* post-process */
 
     return(rtn);
+}
+
+static long init_mbbo_snmp(struct mbboRecord *pmbbo, long snmpVersion)
+{
+    int status = 0;
+    SNMP_REQUEST  *pRequest;
+    char *pValStr;
+    int i32temp;
+
+    /* type must be INST_IO */
+    if(pmbbo->out.type != INST_IO)
+    {
+        recGblRecordError(S_db_badField,(void *)pmbbo, "devMbboSnmp (init_record) Illegal INP field");
+        pmbbo->pact = TRUE;
+        return(S_db_badField);
+    }
+
+    status = snmpRequestInit((dbCommon *)pmbbo, pmbbo->out.value.instio.string, snmpVersion, MAX_CA_STRING_SIZE, 1, 'i');
+
+    if (status)
+    {
+        recGblRecordError(S_db_badField, (void *)pmbbo,"devMbboSnmp (init_record) bad parameters");
+        pmbbo->pact = TRUE;
+        return(S_db_badField);
+    }
+
+    pRequest = (SNMP_REQUEST *)(pmbbo->dpvt);
+    if(0 == snmpQuerySingleVar(pRequest))
+    {
+        if(SNMP_DEV_DEBUG)   printf("Record [%s] received string [%s] during init.\n", pmbbo->name, pRequest->pValStr);
+        pValStr = strrchr(pRequest->pValStr, ':');
+        if(pValStr == NULL) pValStr = pRequest->pValStr;
+        else pValStr++;
+
+        /* skip non-digit, particularly because of WIENER crate has ON(1), OFF(0) */
+        for (; isdigit(*pValStr) == 0 && *pValStr != '-' && *pValStr != '\0'; ) ++pValStr;
+        /* Scan for an integer */
+        if (pValStr && sscanf(pValStr, "%d", &i32temp))
+        {
+            pmbbo->rval = i32temp;
+            pmbbo->udf = FALSE;
+            pmbbo->stat=pmbbo->sevr=NO_ALARM;
+        }
+        else
+        {
+            pmbbo->rval = -1;
+            errlogPrintf("Record [%s] parsing response [%s] error!\n", pmbbo->name, pValStr);
+    		return 1;	/* no convert */
+        }
+    }
+    return 0;	/* convert */
+}
+
+static long init_mbbo_snmpV1(struct mbboRecord *pmbbo)
+{
+    return init_mbbo_snmp(pmbbo, SNMP_VERSION_1);
+}
+
+static long init_mbbo_snmpV2c(struct mbboRecord *pmbbo)
+{
+    return init_mbbo_snmp(pmbbo, SNMP_VERSION_2c);
+}
+
+static long write_mbbo_snmp(struct mbboRecord *pmbbo)
+{
+    SNMP_REQUEST  *pRequest = (SNMP_REQUEST *)(pmbbo->dpvt);
+
+    if(!pRequest) return(-1);
+
+    if(!pmbbo->pact)
+    {/* pre-process */
+        /* Clean up the request */
+        pRequest->errCode = SNMP_REQUEST_NO_ERR;
+        pRequest->opDone = 0;
+        /* Give the value */
+        /* sprintf(pRequest->pValStr, "%*d", MAX_CA_STRING_SIZE-1, pmbbo->val); */
+        sprintf(pRequest->pValStr, "%d", pmbbo->val);
+
+        if(epicsMessageQueueTrySend(pRequest->pSnmpAgent->msgQ_id, (void *)&pRequest, sizeof(SNMP_REQUEST *)) == -1)
+        {
+            recGblSetSevr(pmbbo, WRITE_ALARM, INVALID_ALARM);
+            errlogPrintf("write_mbbo_snmp: epicsMessageQueueTrySend Error [%s]\n", pmbbo->name);
+            return -1;
+        }
+        else
+        {
+            pmbbo->pact = TRUE;
+        }
+
+    }/* pre-process */
+    else
+    {/* post-process */
+        if( (!pRequest->opDone) || pRequest->errCode )
+        {
+            recGblSetSevr(pmbbo, WRITE_ALARM, INVALID_ALARM);
+            errlogPrintf("Record [%s] received error code [0x%08x]!\n", pmbbo->name, pRequest->errCode);
+            return -1;
+        }
+    }/* post-process */
+
+    return 0;
 }
 
 static long init_bi_snmp(struct biRecord *pbi, long snmpVersion)
