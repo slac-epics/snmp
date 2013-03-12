@@ -14,7 +14,7 @@
 #CROSS_COMPILER_TARGET_ARCHS = RTEMS-beatnik
 #CROSS_COMPILER_TARGET_ARCHS = RTEMS-uC5282
 #CROSS_COMPILER_TARGET_ARCHS = RTEMS-pc586
-CROSS_COMPILER_TARGET_ARCHS = linux-x86
+CROSS_COMPILER_TARGET_ARCHS =
 
 # Set this when your IOC and the host use different paths
 # to access the application. This will be needed to boot
@@ -26,4 +26,7 @@ CROSS_COMPILER_TARGET_ARCHS = linux-x86
 # If you don't want to install into $(TOP) then
 # define INSTALL_LOCATION here
 #INSTALL_LOCATION=<fullpathname>
+
+USR_INCLUDES += -I/reg/g/pcds/package/net-snmp-5.7.2/include
+USR_LDFLAGS  += -L/reg/g/pcds/package/net-snmp-5.7.2/lib -lnetsnmp
 
