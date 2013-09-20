@@ -6,6 +6,10 @@ include $(TOP)/RELEASE_SITE
 # Define the location and version of EPICS base
 # ===============================================================
 BASE_MODULE_VERSION=R3.14.12-0.4.0
+#
+# NOTE: Please do any development for R3.14.12-0.4.0 or newer
+# under $REPO/trunk/pcds/epics/modules/event/current
+#
 EPICS_BASE=$(EPICS_SITE_TOP)/base/$(BASE_MODULE_VERSION)
 
 # ===============================================================
