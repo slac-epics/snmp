@@ -54,7 +54,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
             epicsThreadSleep(2.0);  /* Avoid super loop to starve CPU */
 			continue;
         }
-		// Note that pRequest now holds our next SNMP_REQUEST
+		/* Note that pRequest now holds our next SNMP_REQUEST */
 
 		/* Figure out how many requests in queue */
 		NofReqs = epicsMessageQueuePending(pSnmpAgent->msgQ_id);
