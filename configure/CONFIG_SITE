@@ -14,8 +14,10 @@
 #CROSS_COMPILER_TARGET_ARCHS = RTEMS-beatnik
 #CROSS_COMPILER_TARGET_ARCHS = RTEMS-uC5282
 #CROSS_COMPILER_TARGET_ARCHS = RTEMS-pc586
-#CROSS_COMPILER_TARGET_ARCHS =
-CROSS_COMPILER_TARGET_ARCHS = linux-x86_64
+CROSS_COMPILER_TARGET_ARCHS =
+#ifeq '$(EPICS_HOST_ARCH)' 'linux-x86_64'
+#CROSS_COMPILER_TARGET_ARCHS += linux-x86
+#endif
 
 # Set this when your IOC and the host use different paths
 # to access the application. This will be needed to boot
@@ -23,7 +25,7 @@ CROSS_COMPILER_TARGET_ARCHS = linux-x86_64
 # You must rebuild in the iocBoot directory for this to
 # take effect.
 #IOCS_APPL_TOP = <path to application top as seen by IOC>
-BUILD_FOR_HOST_ARCH=
+BUILD_FOR_HOST_ARCH=1
 
 
 # If you don't want to install into $(TOP) then

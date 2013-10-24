@@ -54,6 +54,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
             epicsThreadSleep(2.0);  /* Avoid super loop to starve CPU */
 			continue;
         }
+		// Note that pRequest now holds our next SNMP_REQUEST
 
 		/* Figure out how many requests in queue */
 		NofReqs = epicsMessageQueuePending(pSnmpAgent->msgQ_id);
@@ -63,7 +64,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 		NofReqs = MIN( (NofReqs + 1), (MAX(1, snmpMaxVarsPerMsg)) ) - 1;
  
         /* some requests come in */
-		if(SNMP_DRV_DEBUG >= 4) printf("Snmp_Operation loop for agent[%s] processing %d requests\n", pSnmpAgent->pActiveSession->peername, NofReqs + 1 );
+		if(SNMP_DRV_DEBUG >= 3) printf("Snmp_Operation loop for agent[%s] processing %d requests\n", pSnmpAgent->pActiveSession->peername, NofReqs + 1 );
 
 		if ( requestQryList.node.next || requestQryList.node.previous || requestQryList.count )
 			errlogPrintf( "Found %d stale requestQry nodes.?\n", requestQryList.count );
@@ -217,7 +218,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 								/* process cmd record */
 								if(pRequest->pRecord)
 								{
-									if(SNMP_DRV_DEBUG >= 2) printf("Got response for record [%s]=[%s]\n", pRequest->pRecord->name, pRequest->pValStr);
+									if(SNMP_DRV_DEBUG >= 4) printf("Got response for record [%s]=[%s]\n", pRequest->pRecord->name, pRequest->pValStr);
 									dbScanLock(pRequest->pRecord);
 									(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
 									dbScanUnlock(pRequest->pRecord);
@@ -225,9 +226,11 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 								}
 
 								/* Remove the request from link list */
-								epicsMutexLock(pSnmpAgent->mutexLock); 
+								/* This mutex is only needed to protect snmpReqPtrList	*/
+								/* epicsMutexLock(pSnmpAgent->mutexLock);				*/
 								ellDelete(&requestCmdList, (ELLNODE *) pRequest);
-								epicsMutexUnlock(pSnmpAgent->mutexLock); 
+								/* This mutex is only needed to protect snmpReqPtrList	*/
+								/* epicsMutexUnlock(pSnmpAgent->mutexLock);				*/
 							}
 							else
 							{
@@ -275,9 +278,11 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 								}
 
 								/* Remove the request from link list */
-								epicsMutexLock(pSnmpAgent->mutexLock);
+								/* This mutex is only needed to protect snmpReqPtrList	*/
+								/* epicsMutexLock(pSnmpAgent->mutexLock);				*/
 								ellDelete(&requestCmdList, (ELLNODE *) pRequest);
-								epicsMutexUnlock(pSnmpAgent->mutexLock);
+								/* This mutex is only needed to protect snmpReqPtrList	*/
+								/* epicsMutexUnlock(pSnmpAgent->mutexLock);				*/
 							}
 							else
 							{
@@ -339,7 +344,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 						}
 					}
 
-					/* errlogPrintf("%s: Snmp Query Timeout\n", pSnmpAgent->pActiveSession->peername); */
+					/* errlogPrintf("%s: Snmp CmdList Timeout\n", pSnmpAgent->pActiveSession->peername); */
 					break;
 				case STAT_ERROR:
 				default:
@@ -366,7 +371,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 						}
 					}
 
-					errlogPrintf("Query %s error %s!\n", pSnmpAgent->pActiveSession->peername, errstr);
+					errlogPrintf("CmdList %s error %s!\n", pSnmpAgent->pActiveSession->peername, errstr);
 					free(errstr);
 				}
 					break;
@@ -439,7 +444,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 								/* process query record */
 								if(pRequest->pRecord)
 								{
-									if(SNMP_DRV_DEBUG >= 3) printf("Got response for record [%s]=[%s]\n", pRequest->pRecord->name, pRequest->pValStr);
+									if(SNMP_DRV_DEBUG >= 4) printf("Got response for record [%s]=[%s]\n", pRequest->pRecord->name, pRequest->pValStr);
 									dbScanLock(pRequest->pRecord);
 									(*(pRequest->pRecord->rset->process))(pRequest->pRecord);
 									dbScanUnlock(pRequest->pRecord);
@@ -447,9 +452,11 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 								}
 
 								/* Remove the request from link list */
-								epicsMutexLock(pSnmpAgent->mutexLock); 
+								/* This mutex is only needed to protect snmpReqPtrList	*/
+								/* epicsMutexLock(pSnmpAgent->mutexLock);				*/
 								ellDelete(&requestQryList, (ELLNODE *) pRequest);
-								epicsMutexUnlock(pSnmpAgent->mutexLock); 
+								/* This mutex is only needed to protect snmpReqPtrList	*/
+								/* epicsMutexUnlock(pSnmpAgent->mutexLock);				*/
 							}
 							else
 							{
@@ -497,9 +504,11 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
 								}
 
 								/* Remove the request from link list */
-								epicsMutexLock(pSnmpAgent->mutexLock);
+								/* This mutex is only needed to protect snmpReqPtrList	*/
+								/* epicsMutexLock(pSnmpAgent->mutexLock);				*/
 								ellDelete(&requestQryList, (ELLNODE *) pRequest);
-								epicsMutexUnlock(pSnmpAgent->mutexLock);
+								/* This mutex is only needed to protect snmpReqPtrList	*/
+								/* epicsMutexUnlock(pSnmpAgent->mutexLock);				*/
 							}
 							else
 							{
@@ -731,7 +740,7 @@ int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion,
         pSnmpAgent->opthread_id = epicsThreadCreate(pSnmpAgent->opthread_name, OPTHREAD_PRIORITY, OPTHREAD_STACK, (EPICSTHREADFUNC)Snmp_Operation, (void *)pSnmpAgent);
         if(pSnmpAgent->opthread_id == (epicsThreadId)(-1))
         {
-            epicsMutexUnlock(pSnmpAgent->mutexLock);
+            /* epicsMutexUnlock(pSnmpAgent->mutexLock); wasn't locked */
             errlogPrintf("Fail to create operation thread for snmp agent %s, Fatal!\n", peerName);
             epicsThreadSuspendSelf();
             return -1;
