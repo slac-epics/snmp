@@ -6,3 +6,7 @@ Adapted for use in A2
 
 You need to modify the envPath and configure/RELEASE files and set the correct paths.
 then run make inside the top folder.
+
+Dependencies: snmp development packages (net-snmp-dev, net-snmp, net-snmp-utils on Fedora).
+
+Comes with some MIB files ;)
