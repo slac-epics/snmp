@@ -1,0 +1,14 @@
+*.d
+*.a
+*.o
+*.swp
+*.so
+*.so.
+lib/*
+bin/*
+
+*/O.*/
+*/*/O.*/
+*.creator.user
+db/*
+dbd/*

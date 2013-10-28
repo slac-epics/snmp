@@ -1,0 +1,5 @@
+epicsEnvSet(ARCH,"linux-x86_64")
+epicsEnvSet(IOC,"iocsnmp")
+epicsEnvSet("TOP","/home/epics/snmp2epics/snmp")
+epicsEnvSet("EPICS_BASE","/home/epics/epics/base")
+
