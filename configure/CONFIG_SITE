@@ -15,9 +15,9 @@
 #CROSS_COMPILER_TARGET_ARCHS = RTEMS-uC5282
 #CROSS_COMPILER_TARGET_ARCHS = RTEMS-pc586
 CROSS_COMPILER_TARGET_ARCHS =
-#ifeq '$(EPICS_HOST_ARCH)' 'linux-x86_64'
-#CROSS_COMPILER_TARGET_ARCHS += linux-x86
-#endif
+ifeq '$(EPICS_HOST_ARCH)' 'rhel6-x86_64'
+CROSS_COMPILER_TARGET_ARCHS += linuxRT_glibc-x86
+endif
 
 # Set this when your IOC and the host use different paths
 # to access the application. This will be needed to boot
@@ -32,7 +32,10 @@ BUILD_FOR_HOST_ARCH=1
 # define INSTALL_LOCATION here
 #INSTALL_LOCATION=<fullpathname>
 
-USR_INCLUDES += -I/reg/g/pcds/package/net-snmp-5.7.2/include
-USR_LDFLAGS  += -L/reg/g/pcds/package/net-snmp-5.7.2/lib 
+NET_SNMP_PKG	= /reg/g/pcds/package/net-snmp-5.7.2
+USR_INCLUDES += -I$(NET_SNMP_PKG)/include
+USR_LDFLAGS  += -L$(NET_SNMP_PKG)/lib 
 USR_SYS_LIBS += netsnmp
+USR_CFLAGS   += $(shell $(NET_SNMP_PKG)/bin/net-snmp-config --cflags)
+USR_LDFLAGS  += $(shell $(NET_SNMP_PKG)/bin/net-snmp-config --libs)
 

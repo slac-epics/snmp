@@ -3,7 +3,11 @@
 # We will build some tools/scripts that allow us to
 # change this easily when relocating software.
 # ==============================================================
+-include $(CONFIG_SITE_TOP)/common_dirs.mak
+ifndef EPICS_SITE_TOP
 EPICS_SITE_TOP=/reg/g/pcds/package/epics/3.14
+endif
+EPICS_SITE_TOP:=$(EPICS_SITE_TOP)
 
 # EPICS module releases are kept here
 EPICS_MODULES=$(EPICS_SITE_TOP)/modules

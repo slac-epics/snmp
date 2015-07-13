@@ -4,10 +4,7 @@ include $(TOP)/configure/CONFIG
 #----------------------------------------
 #  ADD MACRO DEFINITIONS AFTER THIS LINE
 #=============================
-#USR_CFLAGS += -I/usr/local/include        #Path to snmp if ness.
-USR_CFLAGS += `net-snmp-config --cflags`
 USR_CFLAGS += -DNETSNMP_NO_INLINE
-USR_LDFLAGS += `net-snmp-config --libs`
 
 #==================================================
 # The following will built and instaled:
