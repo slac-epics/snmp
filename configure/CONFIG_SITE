@@ -32,7 +32,7 @@ BUILD_FOR_HOST_ARCH=1
 # define INSTALL_LOCATION here
 #INSTALL_LOCATION=<fullpathname>
 
-NET_SNMP_PKG	= /reg/g/pcds/package/net-snmp-5.7.2
+NET_SNMP_PKG	= $(PACKAGE_SITE_TOP)/net-snmp/5.7.2
 USR_INCLUDES += -I$(NET_SNMP_PKG)/include
 USR_LDFLAGS  += -L$(NET_SNMP_PKG)/lib 
 USR_SYS_LIBS += netsnmp
