@@ -606,8 +606,8 @@ static long write_mbbo_snmp(struct mbboRecord *pmbbo)
         pRequest->errCode = SNMP_REQUEST_NO_ERR;
         pRequest->opDone = 0;
         /* Give the value */
-        /* sprintf(pRequest->pValStr, "%*d", MAX_CA_STRING_SIZE-1, pmbbo->val); */
-        sprintf(pRequest->pValStr, "%d", pmbbo->val);
+        /* sprintf(pRequest->pValStr, "%*d", MAX_CA_STRING_SIZE-1, pmbbo->rval); */
+        sprintf(pRequest->pValStr, "%d", pmbbo->rval);
 
         if(epicsMessageQueueTrySend(pRequest->pSnmpAgent->msgQ_id, (void *)&pRequest, sizeof(SNMP_REQUEST *)) == -1)
         {
