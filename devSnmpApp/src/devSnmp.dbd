@@ -45,3 +45,4 @@ variable( SNMP_DEV_DEBUG,	 int )
 variable( SNMP_DRV_DEBUG,	 int )
 variable( snmpMaxVarsPerMsg, int )
 
+registrar(snmpRegisterCommands)

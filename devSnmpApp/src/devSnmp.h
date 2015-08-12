@@ -19,6 +19,7 @@
 #include <string.h>
 #include <stddef.h>
 #include <ctype.h>
+#include <sys/time.h>
 
 #include <net-snmp/net-snmp-config.h>
 #include <net-snmp/net-snmp-includes.h>
@@ -27,6 +28,7 @@
 #if EPICS_VERSION>=3 && EPICS_REVISION>=14
 #include <epicsExport.h>
 #include <alarm.h>
+#include <dbScan.h>
 #include <dbDefs.h>
 #include <dbAccess.h>
 #include <recSup.h>
@@ -127,6 +129,23 @@ typedef struct OID
     size_t		requestOidLen;
 } OID;
 
+typedef struct SNMP_WALK
+{
+    ELLNODE			node;	/* Link List Node */
+    SNMP_AGENT                 *agent;
+    int                         count;
+    struct timeval              delay;
+    OID                         objectId;
+    struct timeval              nextWalk;
+} SNMP_WALK;
+
+typedef struct SNMP_WALK_OID
+{
+    char                        pBuf[1024];
+    int                         errCode;
+    IOSCANPVT                   iopvt;
+} SNMP_WALK_OID;
+
 typedef struct SNMP_REQUEST
 {
     ELLNODE		node;	/* Link List Node */
@@ -176,6 +195,8 @@ typedef struct SNMP_REQINFO
 
 int snmpRequestInit(dbCommon * pRecord, const char * ioString, long snmpVersion, size_t valStrLen, int cmd, char type);
 int snmpQuerySingleVar(SNMP_REQUEST * pRequest);
+
+extern netsnmp_oid_stash_node *stashRoot;
 
 #ifdef __cplusplus
 }

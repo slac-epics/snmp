@@ -13,6 +13,7 @@
 
 #include "devSnmp.h"
 #include "epicsExport.h"
+#include "iocsh.h"
 
 int SNMP_DEV_DEBUG = 0;
 
@@ -74,6 +75,8 @@ static long init_wf_snmpV1(struct waveformRecord *pwf);
 static long init_wf_snmpV2c(struct waveformRecord *pwf);
 static long read_wf_snmp(struct waveformRecord *pwf);
 
+static long get_ioint_info(int cmd, struct dbCommon *prec, IOSCANPVT *iopvt);
+
 /* global struct for devSup */
 typedef struct {
         long            number;
@@ -85,29 +88,29 @@ typedef struct {
         DEVSUPFUN       special_linconv;
 } SNMP_DEV_SUP_SET;
 
-SNMP_DEV_SUP_SET devAiSnmpV1 = {6, NULL, NULL, init_ai_snmpV1,  NULL, read_ai_snmp, NULL};
+SNMP_DEV_SUP_SET devAiSnmpV1 = {6, NULL, NULL, init_ai_snmpV1,  get_ioint_info, read_ai_snmp, NULL};
 SNMP_DEV_SUP_SET devAoSnmpV1 = {6, NULL, NULL, init_ao_snmpV1,  NULL, write_ao_snmp, NULL};
-SNMP_DEV_SUP_SET devLiSnmpV1 = {6, NULL, NULL, init_li_snmpV1,  NULL, read_li_snmp, NULL};
-SNMP_DEV_SUP_SET devMbbiSnmpV1={6, NULL, NULL, init_mbbi_snmpV1,  NULL, read_mbbi_snmp, NULL};
+SNMP_DEV_SUP_SET devLiSnmpV1 = {6, NULL, NULL, init_li_snmpV1,  get_ioint_info, read_li_snmp, NULL};
+SNMP_DEV_SUP_SET devMbbiSnmpV1={6, NULL, NULL, init_mbbi_snmpV1,  get_ioint_info, read_mbbi_snmp, NULL};
 SNMP_DEV_SUP_SET devMbboSnmpV1={6, NULL, NULL, init_mbbo_snmpV1,  NULL, write_mbbo_snmp, NULL};
-SNMP_DEV_SUP_SET devBiSnmpV1 = {6, NULL, NULL, init_bi_snmpV1,  NULL, read_bi_snmp, NULL};
+SNMP_DEV_SUP_SET devBiSnmpV1 = {6, NULL, NULL, init_bi_snmpV1,  get_ioint_info, read_bi_snmp, NULL};
 SNMP_DEV_SUP_SET devBoSnmpV1 = {6, NULL, NULL, init_bo_snmpV1,  NULL, write_bo_snmp, NULL};
 SNMP_DEV_SUP_SET devLoSnmpV1 = {6, NULL, NULL, init_lo_snmpV1,  NULL, write_lo_snmp, NULL};
-SNMP_DEV_SUP_SET devSiSnmpV1 = {6, NULL, NULL, init_si_snmpV1,  NULL, read_si_snmp, NULL};
+SNMP_DEV_SUP_SET devSiSnmpV1 = {6, NULL, NULL, init_si_snmpV1,  get_ioint_info, read_si_snmp, NULL};
 SNMP_DEV_SUP_SET devSoSnmpV1 = {6, NULL, NULL, init_so_snmpV1,  NULL, write_so_snmp, NULL};
-SNMP_DEV_SUP_SET devWfSnmpV1 = {6, NULL, NULL, init_wf_snmpV1,  NULL, read_wf_snmp, NULL};
+SNMP_DEV_SUP_SET devWfSnmpV1 = {6, NULL, NULL, init_wf_snmpV1,  get_ioint_info, read_wf_snmp, NULL};
 
-SNMP_DEV_SUP_SET devAiSnmpV2c = {6, NULL, NULL, init_ai_snmpV2c,  NULL, read_ai_snmp, NULL};
+SNMP_DEV_SUP_SET devAiSnmpV2c = {6, NULL, NULL, init_ai_snmpV2c,  get_ioint_info, read_ai_snmp, NULL};
 SNMP_DEV_SUP_SET devAoSnmpV2c = {6, NULL, NULL, init_ao_snmpV2c,  NULL, write_ao_snmp, NULL};
-SNMP_DEV_SUP_SET devLiSnmpV2c = {6, NULL, NULL, init_li_snmpV2c,  NULL, read_li_snmp, NULL};
-SNMP_DEV_SUP_SET devMbbiSnmpV2c={6, NULL, NULL, init_mbbi_snmpV2c,  NULL, read_mbbi_snmp, NULL};
+SNMP_DEV_SUP_SET devLiSnmpV2c = {6, NULL, NULL, init_li_snmpV2c,  get_ioint_info, read_li_snmp, NULL};
+SNMP_DEV_SUP_SET devMbbiSnmpV2c={6, NULL, NULL, init_mbbi_snmpV2c,  get_ioint_info, read_mbbi_snmp, NULL};
 SNMP_DEV_SUP_SET devMbboSnmpV2c={6, NULL, NULL, init_mbbo_snmpV2c,  NULL, write_mbbo_snmp, NULL};
-SNMP_DEV_SUP_SET devBiSnmpV2c={6, NULL, NULL, init_bi_snmpV2c,  NULL, read_bi_snmp, NULL};
+SNMP_DEV_SUP_SET devBiSnmpV2c={6, NULL, NULL, init_bi_snmpV2c,  get_ioint_info, read_bi_snmp, NULL};
 SNMP_DEV_SUP_SET devBoSnmpV2c={6, NULL, NULL, init_bo_snmpV2c,  NULL, write_bo_snmp, NULL};
 SNMP_DEV_SUP_SET devLoSnmpV2c = {6, NULL, NULL, init_lo_snmpV2c,  NULL, write_lo_snmp, NULL};
-SNMP_DEV_SUP_SET devSiSnmpV2c = {6, NULL, NULL, init_si_snmpV2c,  NULL, read_si_snmp, NULL};
+SNMP_DEV_SUP_SET devSiSnmpV2c = {6, NULL, NULL, init_si_snmpV2c,  get_ioint_info, read_si_snmp, NULL};
 SNMP_DEV_SUP_SET devSoSnmpV2c = {6, NULL, NULL, init_so_snmpV2c,  NULL, write_so_snmp, NULL};
-SNMP_DEV_SUP_SET devWfSnmpV2c = {6, NULL, NULL, init_wf_snmpV2c,  NULL, read_wf_snmp, NULL};
+SNMP_DEV_SUP_SET devWfSnmpV2c = {6, NULL, NULL, init_wf_snmpV2c,  get_ioint_info, read_wf_snmp, NULL};
 
 #if EPICS_VERSION>=3 && EPICS_REVISION>=14
 epicsExportAddress(dset, devAiSnmpV1);
@@ -134,6 +137,16 @@ epicsExportAddress(dset, devSiSnmpV2c);
 epicsExportAddress(dset, devSoSnmpV2c);
 epicsExportAddress(dset, devWfSnmpV2c);
 #endif
+
+static long get_ioint_info(int cmd, struct dbCommon *prec, IOSCANPVT *iopvt)
+{
+    SNMP_REQUEST  *pRequest = (SNMP_REQUEST *)(prec->dpvt);
+    SNMP_WALK_OID *data = netsnmp_oid_stash_get_data(stashRoot, 
+                                                     pRequest->objectId.requestOid,
+                                                     pRequest->objectId.requestOidLen);
+    *iopvt = data->iopvt;
+    return 0;
+}
 
 static long init_ai_snmp(struct aiRecord *pai, long snmpVersion)
 {
@@ -177,8 +190,17 @@ static long read_ai_snmp(struct aiRecord *pai)
 
     if(!pRequest) return(-1);
 
-    if(!pai->pact)
-    {/* pre-process */
+    if (pai->scan == SCAN_IO_EVENT) {
+        SNMP_WALK_OID *data = netsnmp_oid_stash_get_data(stashRoot, 
+                                                         pRequest->objectId.requestOid,
+                                                         pRequest->objectId.requestOidLen);
+        pRequest->opDone = 1;
+        pRequest->errCode = data->errCode;
+        if (data->errCode == SNMP_REQUEST_NO_ERR) {
+            strncpy(pRequest->pValStr, data->pBuf, pRequest->valStrLen - 1);
+            pRequest->pValStr[pRequest->valStrLen - 1] = '\0';
+        }
+    } else if (!pai->pact) {/* pre-process */
         /* Clean up the request */
         pRequest->errCode = SNMP_REQUEST_NO_ERR;
         pRequest->opDone = 0;
@@ -194,9 +216,9 @@ static long read_ai_snmp(struct aiRecord *pai)
             pai->pact = TRUE;
             rtn = NO_CONVERT;
         }
-
+        return rtn;
     }/* pre-process */
-    else
+
     {/* post-process */
         if( (!pRequest->opDone) || pRequest->errCode )
         {
@@ -365,8 +387,17 @@ static long read_li_snmp(struct longinRecord *pli)
 
     if(!pRequest) return(-1);
 
-    if(!pli->pact)
-    {/* pre-process */
+    if (pli->scan == SCAN_IO_EVENT) {
+        SNMP_WALK_OID *data = netsnmp_oid_stash_get_data(stashRoot, 
+                                                         pRequest->objectId.requestOid,
+                                                         pRequest->objectId.requestOidLen);
+        pRequest->opDone = 1;
+        pRequest->errCode = data->errCode;
+        if (data->errCode == SNMP_REQUEST_NO_ERR) {
+            strncpy(pRequest->pValStr, data->pBuf, pRequest->valStrLen - 1);
+            pRequest->pValStr[pRequest->valStrLen - 1] = '\0';
+        }
+    } else if (!pli->pact) {/* pre-process */
         /* Clean up the request */
         pRequest->errCode = SNMP_REQUEST_NO_ERR;
         pRequest->opDone = 0;
@@ -382,9 +413,9 @@ static long read_li_snmp(struct longinRecord *pli)
             pli->pact = TRUE;
             rtn = 0;
         }
-
+        return rtn;
     }/* pre-process */
-    else
+
     {/* post-process */
         if( (!pRequest->opDone) || pRequest->errCode )
         {
@@ -467,8 +498,17 @@ static long read_mbbi_snmp(struct mbbiRecord *pmbbi)
 
     if(!pRequest) return(-1);
 
-    if(!pmbbi->pact)
-    {	/* pre-process */
+    if (pmbbi->scan == SCAN_IO_EVENT) {
+        SNMP_WALK_OID *data = netsnmp_oid_stash_get_data(stashRoot, 
+                                                         pRequest->objectId.requestOid,
+                                                         pRequest->objectId.requestOidLen);
+        pRequest->opDone = 1;
+        pRequest->errCode = data->errCode;
+        if (data->errCode == SNMP_REQUEST_NO_ERR) {
+            strncpy(pRequest->pValStr, data->pBuf, pRequest->valStrLen - 1);
+            pRequest->pValStr[pRequest->valStrLen - 1] = '\0';
+        }
+    } else if (!pmbbi->pact) {/* pre-process */
         /* Clean up the request */
         pRequest->errCode = SNMP_REQUEST_NO_ERR;
         pRequest->opDone = 0;
@@ -486,9 +526,9 @@ static long read_mbbi_snmp(struct mbbiRecord *pmbbi)
             pmbbi->pact = TRUE;
             rtn = 0;
         }
+        return rtn;
     }	/* pre-process */
 
-    else
 
     {	/* post-process */
         if( (!pRequest->opDone) || pRequest->errCode )
@@ -677,8 +717,17 @@ static long read_bi_snmp(struct biRecord *pbi)
 
     if(!pRequest) return(-1);
 
-    if(!pbi->pact)
-    {	/* pre-process */
+    if (pbi->scan == SCAN_IO_EVENT) {
+        SNMP_WALK_OID *data = netsnmp_oid_stash_get_data(stashRoot, 
+                                                         pRequest->objectId.requestOid,
+                                                         pRequest->objectId.requestOidLen);
+        pRequest->opDone = 1;
+        pRequest->errCode = data->errCode;
+        if (data->errCode == SNMP_REQUEST_NO_ERR) {
+            strncpy(pRequest->pValStr, data->pBuf, pRequest->valStrLen - 1);
+            pRequest->pValStr[pRequest->valStrLen - 1] = '\0';
+        }
+    } else if (!pbi->pact) {/* pre-process */
         /* Clean up the request */
         pRequest->errCode = SNMP_REQUEST_NO_ERR;
         pRequest->opDone = 0;
@@ -694,9 +743,8 @@ static long read_bi_snmp(struct biRecord *pbi)
             pbi->pact = TRUE;
             rtn = 0;
         }
+        return rtn;
     }	/* pre-process */
-
-    else
 
     {	/* post-process */
         if( (!pRequest->opDone) || pRequest->errCode )
@@ -980,8 +1028,17 @@ static long read_si_snmp(struct stringinRecord *psi)
 
     if(!pRequest) return(-1);
 
-    if(!psi->pact)
-    {/* pre-process */
+    if (psi->scan == SCAN_IO_EVENT) {
+        SNMP_WALK_OID *data = netsnmp_oid_stash_get_data(stashRoot, 
+                                                         pRequest->objectId.requestOid,
+                                                         pRequest->objectId.requestOidLen);
+        pRequest->opDone = 1;
+        pRequest->errCode = data->errCode;
+        if (data->errCode == SNMP_REQUEST_NO_ERR) {
+            strncpy(pRequest->pValStr, data->pBuf, pRequest->valStrLen - 1);
+            pRequest->pValStr[pRequest->valStrLen - 1] = '\0';
+        }
+    } else if (!psi->pact) {/* pre-process */
         /* Clean up the request */
         pRequest->errCode = SNMP_REQUEST_NO_ERR;
         pRequest->opDone = 0;
@@ -997,9 +1054,9 @@ static long read_si_snmp(struct stringinRecord *psi)
             psi->pact = TRUE;
             rtn = 0;
         }
-
+        return rtn;
     }/* pre-process */
-    else
+
     {/* post-process */
         if( (!pRequest->opDone) || pRequest->errCode )
         {
@@ -1202,8 +1259,17 @@ static long read_wf_snmp(struct waveformRecord *pwf)
 
     if(!pRequest) return(-1);
 
-    if(!pwf->pact)
-    {/* pre-process */
+    if (pwf->scan == SCAN_IO_EVENT) {
+        SNMP_WALK_OID *data = netsnmp_oid_stash_get_data(stashRoot, 
+                                                         pRequest->objectId.requestOid,
+                                                         pRequest->objectId.requestOidLen);
+        pRequest->opDone = 1;
+        pRequest->errCode = data->errCode;
+        if (data->errCode == SNMP_REQUEST_NO_ERR) {
+            strncpy(pRequest->pValStr, data->pBuf, pRequest->valStrLen - 1);
+            pRequest->pValStr[pRequest->valStrLen - 1] = '\0';
+        }
+    } else if (!pwf->pact) {/* pre-process */
         /* Clean up the request */
         pRequest->errCode = SNMP_REQUEST_NO_ERR;
         pRequest->opDone = 0;
@@ -1219,9 +1285,9 @@ static long read_wf_snmp(struct waveformRecord *pwf)
             pwf->pact = TRUE;
             rtn = 0;
         }
-
+        return rtn;
     }/* pre-process */
-    else
+
     {/* post-process */
         if( (!pRequest->opDone) || pRequest->errCode )
         {
@@ -1255,3 +1321,35 @@ static long read_wf_snmp(struct waveformRecord *pwf)
     return(rtn);
 }
 
+/*
+ * IOC shell command registration
+ */
+static const iocshArg Snmp2cWalkArg0 = {"host", iocshArgString};
+static const iocshArg Snmp2cWalkArg1 = {"community", iocshArgString};
+static const iocshArg Snmp2cWalkArg2 = {"OIDname", iocshArgString};
+static const iocshArg Snmp2cWalkArg3 = {"count",iocshArgInt};
+static const iocshArg Snmp2cWalkArg4 = {"delay",iocshArgDouble};
+static const iocshArg *Snmp2cWalkArgs[] =
+{
+    &Snmp2cWalkArg0, &Snmp2cWalkArg1, &Snmp2cWalkArg2, &Snmp2cWalkArg3, &Snmp2cWalkArg4,
+};
+static const iocshFuncDef Snmp2cWalkFuncDef = { "Snmp2cWalk", 5, Snmp2cWalkArgs };
+
+extern void Snmp2cWalk(char *host, char *community, char *oidname, int count, double delay);
+
+static void Snmp2cWalkCallFunc( const iocshArgBuf * args )
+{
+    Snmp2cWalk(args[0].sval, args[1].sval, args[2].sval, args[3].ival, args[4].dval);
+}
+
+static void
+snmpRegisterCommands(void)
+{
+    static int firstTime = 1;
+    if (firstTime)
+	{
+        iocshRegister(&Snmp2cWalkFuncDef,Snmp2cWalkCallFunc);
+        firstTime = 0;
+    }
+}
+epicsExportRegistrar(snmpRegisterCommands);
