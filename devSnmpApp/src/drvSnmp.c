@@ -73,7 +73,6 @@ static int Snmp2cDoWalk(SNMP_WALK *pSnmpWalk)
         status = snmp_sess_synch_response(pSnmpWalk->agent->pSess, pdu, &response);
         if (status != STAT_SUCCESS || response->errstat != SNMP_ERR_NOERROR) {
             snmp_perror("Snmp2cWalk: Can't walk?");
-            free(pSnmpWalk);
             snmp_free_pdu(response);
             return 0;
         }
@@ -130,6 +129,8 @@ static int Snmp2cDoWalk(SNMP_WALK *pSnmpWalk)
 void Snmp2cWalk(char *host, char *community, char *oidname, int count, double delay)
 {
     SNMP_WALK *pSnmpWalk;
+    int i;
+
     if (!snmpInited)
         snmpInit();
     pSnmpWalk = callocMustSucceed(1, sizeof(SNMP_WALK), "calloc buffer for SNMP_WALK");
@@ -150,7 +151,16 @@ void Snmp2cWalk(char *host, char *community, char *oidname, int count, double de
     pSnmpWalk->objectId.requestName = epicsStrDup(oidname);
 
     /* Do the walk immediately! */
-    Snmp2cDoWalk(pSnmpWalk);
+    i = 10;
+    while (!Snmp2cDoWalk(pSnmpWalk) && --i > 0) {
+        printf("WALK %s retry!\n", pSnmpWalk->objectId.requestName);
+    }
+    if (!i) {
+        printf("Giving up on WALK %s!\n", pSnmpWalk->objectId.requestName);
+        free(pSnmpWalk->objectId.requestName);
+        free(pSnmpWalk);
+        return;
+    }
 
     /* Schedule the next walk. */
     gettimeofday(&pSnmpWalk->nextWalk, NULL);
@@ -213,7 +223,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
                 if(msgQstatus < 0)
                     continue;
             } else if (now.tv_sec < pSnmpWalk->nextWalk.tv_sec || 
-                (now.tv_sec < pSnmpWalk->nextWalk.tv_sec &&
+                (now.tv_sec == pSnmpWalk->nextWalk.tv_sec &&
                  now.tv_usec < pSnmpWalk->nextWalk.tv_usec)) {
                 /* The walk is still in the future! */
                 double timeout = ((pSnmpWalk->nextWalk.tv_sec - now.tv_sec) + 
@@ -231,6 +241,7 @@ static int Snmp_Operation(SNMP_AGENT * pSnmpAgent)
                     pSnmpWalk->nextWalk.tv_sec++;
                     pSnmpWalk->nextWalk.tv_usec -= 1000000;
                 }
+
                 /* Try to fit other requests in here! */
                 msgQstatus = epicsMessageQueueTryReceive(pSnmpAgent->msgQ_id, &pRequest, sizeof(SNMP_REQUEST *) );
                 if (msgQstatus < 0)
