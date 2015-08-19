@@ -144,7 +144,19 @@ static long get_ioint_info(int cmd, struct dbCommon *prec, IOSCANPVT *iopvt)
     SNMP_WALK_OID *data = netsnmp_oid_stash_get_data(stashRoot, 
                                                      pRequest->objectId.requestOid,
                                                      pRequest->objectId.requestOidLen);
-    *iopvt = data->iopvt;
+    if (!data) {
+        static IOSCANPVT badscan;
+        static int first = 1;
+        if (first) {
+            first = 0;
+            scanIoInit(&badscan);
+        }
+        *iopvt = badscan;
+        printf("ERROR: record %s, MIB %s is not covered by walk!\n",
+               prec->name, pRequest->objectId.requestName);
+    } else {
+        *iopvt = data->iopvt;
+    }
     return 0;
 }
 
