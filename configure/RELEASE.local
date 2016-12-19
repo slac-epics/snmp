@@ -1,0 +1,55 @@
+# RELEASE.local
+#
+# Fetch path relative EPICS_BASE and EPICS_MODULES
+# from one of the following options
+-include $(TOP)/../../RELEASE_SITE
+-include $(TOP)/RELEASE_SITE
+
+# Check for multiple inclusions
+ifneq ($(wildcard "$(TOP)/../../RELEASE_SITE"),)
+ifneq ($(wildcard "$(TOP)/RELEASE_SITE"),)
+$(error Two RELEASE_SITE files found: $(TOP)/RELEASE_SITE and $(TOP)/../../RELEASE_SITE!)
+endif
+endif
+
+# Check for undefined EPICS_MODULES
+ifndef EPICS_MODULES
+ifneq ($(wildcard "$(TOP)/../../RELEASE_SITE"),)
+$(info RELEASE_SITE Read: $(TOP)/../../RELEASE_SITE)
+endif
+ifneq ($(wildcard "$(TOP)/RELEASE_SITE"),)
+$(info RELEASE_SITE Read: $(TOP)/RELEASE_SITE)
+endif
+$(error EPICS_MODULES not defined!)
+endif
+
+# ==========================================================
+# Define the version strings for all needed modules
+# Use naming pattern:
+#   FOO_MODULE_VERSION = R1.2
+# so scripts can extract version strings
+# Don't set your version to anything such as "test" that
+# could match a directory name.
+# ==========================================================
+
+# ==========================================================
+# Define module paths using pattern
+# FOO = $(EPICS_MODULES)/foo/$(FOO_MODULE_VERSION)
+#  or
+# FOO = /Full/Path/To/Development/Version 
+# ==========================================================
+
+# Set EPICS_BASE last so it appears last in the DB, DBD, INCLUDE, and LIB search paths
+EPICS_BASE              = $(EPICS_SITE_TOP)/base/$(BASE_MODULE_VERSION)
+
+# Check for invalid EPICS_BASE
+ifeq ($(wildcard $(EPICS_BASE)/configure/CONFIG),)
+ifneq ($(wildcard $(TOP)/../../RELEASE_SITE),)
+$(info RELEASE_SITE Read: $(TOP)/../../RELEASE_SITE)
+endif
+ifneq ($(wildcard $(TOP)/RELEASE_SITE),)
+$(info RELEASE_SITE Read: $(TOP)/RELEASE_SITE)
+endif
+$(error EPICS_BASE is invalid: $(EPICS_BASE))
+endif
+

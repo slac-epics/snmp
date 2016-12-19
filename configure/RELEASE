@@ -1,34 +1,7 @@
-# RELEASE
-# Defines location of external products
-include $(TOP)/RELEASE_SITE
+#RELEASE Location of external products
+# Run "gnumake clean uninstall install" in the application
+# top directory each time this file is changed.
+include $(TOP)/configure/RELEASE.local
 
-# ===============================================================
-# Define the location and version of EPICS base
-# ===============================================================
-BASE_MODULE_VERSION=R3.14.12-0.4.0
-#
-# NOTE: Please do any development for R3.14.12-0.4.0 or newer
-# under $REPO/trunk/pcds/epics/modules/event/current
-#
-EPICS_BASE=$(EPICS_SITE_TOP)/base/$(BASE_MODULE_VERSION)
-
-# ===============================================================
-# Define the version(s) of any other needed modules 
-# ===============================================================
-# Example: IPAC_MODULE_VERSION=R2.8.4-0.2.0
-
-# ============================================================
-# External Support module path definitions
-#
-# If any of these macros expand to a path which
-# contains an "include" directory, that directory will be
-# included in the compiler include path.
-#
-# If any of these macros expand to a path which
-# contains a "lib/<arch>" directory, that directory will be
-# included in the compiler link path for that architecture.
-#
-# If your build fails, look for these paths in your build output
-# ============================================================
-# Example: IPAC=$(EPICS_MODULES)/ipac/$(IPAC_MODULE_VERSION)
+# End of file
 
