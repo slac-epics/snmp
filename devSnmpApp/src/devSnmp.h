@@ -52,7 +52,9 @@
 #include <aiRecord.h>
 #include <aoRecord.h>
 #include <mbbiRecord.h>
+#include <mbbiDirectRecord.h>
 #include <mbboRecord.h>
+#include <mbboDirectRecord.h>
 #include <biRecord.h>
 #include <boRecord.h>
 #include <stringinRecord.h>
