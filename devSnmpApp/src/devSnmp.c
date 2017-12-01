@@ -832,7 +832,7 @@ static long init_mbboDirect_snmp(struct mbboDirectRecord *pmbboDirect, long snmp
     /* type must be INST_IO */
     if(pmbboDirect->out.type != INST_IO)
     {
-        recGblRecordError(S_db_badField,(void *)pmbboDirect, "devMbboSnmp (init_record) Illegal INP field");
+        recGblRecordError(S_db_badField,(void *)pmbboDirect, "devMbboDirectSnmp (init_record) Illegal INP field");
         pmbboDirect->pact = TRUE;
         return(S_db_badField);
     }
@@ -841,7 +841,7 @@ static long init_mbboDirect_snmp(struct mbboDirectRecord *pmbboDirect, long snmp
 
     if (status)
     {
-        recGblRecordError(S_db_badField, (void *)pmbboDirect,"devMbboSnmp (init_record) bad parameters");
+        recGblRecordError(S_db_badField, (void *)pmbboDirect,"devMbboDirectSnmp (init_record) bad parameters");
         pmbboDirect->pact = TRUE;
         return(S_db_badField);
     }
