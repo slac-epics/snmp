@@ -1,3 +1,7 @@
+R2.4:
+    S. Stubbs: 11/30/2017
+        Added support for mbbiDirect and mbboDirect records
+
 R2.3:
     H. Slepicka: 12/19/2016
         First version with the new Git Workflow
