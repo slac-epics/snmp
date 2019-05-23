@@ -87,7 +87,7 @@ extern "C" {
 /******************************************************************************************/
 #define OPTHREAD_PRIORITY       (50)            /* opthread Priority, make it a little lower than scan task to finish all request once */
 #define OPTHREAD_STACK          (0x20000)       /* opthread Stack Size */
-#define OPTHREAD_MSGQ_CAPACITY  (200)           /* This means we can support 200 signal records per coupler */
+#define OPTHREAD_MSGQ_CAPACITY  (2000)           /* This means we can support 2000 signal records per coupler */
 
 /******************************************************************************************/
 /*********************       EPICS device support return        ***************************/

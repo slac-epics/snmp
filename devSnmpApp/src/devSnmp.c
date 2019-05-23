@@ -224,6 +224,8 @@ static long read_ai_snmp(struct aiRecord *pai)
         SNMP_WALK_OID *data = netsnmp_oid_stash_get_data(stashRoot, 
                                                          pRequest->objectId.requestOid,
                                                          pRequest->objectId.requestOidLen);
+        if (!data)
+            return -1;
         pRequest->opDone = 1;
         pRequest->errCode = data->errCode;
         if (data->errCode == SNMP_REQUEST_NO_ERR) {
@@ -421,6 +423,8 @@ static long read_li_snmp(struct longinRecord *pli)
         SNMP_WALK_OID *data = netsnmp_oid_stash_get_data(stashRoot, 
                                                          pRequest->objectId.requestOid,
                                                          pRequest->objectId.requestOidLen);
+        if (!data)
+            return -1;
         pRequest->opDone = 1;
         pRequest->errCode = data->errCode;
         if (data->errCode == SNMP_REQUEST_NO_ERR) {
@@ -470,15 +474,15 @@ static long read_li_snmp(struct longinRecord *pli)
             {
                 pli->val = i32temp;
                 pli->udf = FALSE;
-				rtn = 0;
-			}
+                rtn = 0;
+            }
             else
             {
                 pli->val = -1;
                 recGblSetSevr(pli, READ_ALARM, INVALID_ALARM);
                 errlogPrintf("Record [%s] parsing response [%s] error!\n", pli->name, pValStr);
-				rtn = -1;
-			}
+                rtn = -1;
+            }
         }
     }/* post-process */
 
@@ -532,6 +536,8 @@ static long read_mbbi_snmp(struct mbbiRecord *pmbbi)
         SNMP_WALK_OID *data = netsnmp_oid_stash_get_data(stashRoot, 
                                                          pRequest->objectId.requestOid,
                                                          pRequest->objectId.requestOidLen);
+        if (!data)
+            return -1;
         pRequest->opDone = 1;
         pRequest->errCode = data->errCode;
         if (data->errCode == SNMP_REQUEST_NO_ERR) {
@@ -569,34 +575,32 @@ static long read_mbbi_snmp(struct mbbiRecord *pmbbi)
         }
         else
         {
-			if ( pmbbi->tpro )
-				printf( "read_mbbi_snmp [%s]: Val %d, received string [%s]\n", pmbbi->name, pmbbi->val, pRequest->pValStr );
-            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] received string [%s]\n", pmbbi->name, pRequest->pValStr);
+            if ( pmbbi->tpro )
+                printf( "read_mbbi_snmp [%s]: Val %d, received string [%s]\n", pmbbi->name, pmbbi->val, pRequest->pValStr );
+            if(SNMP_DEV_DEBUG > 1)
+                printf("Record [%s] received string [%s]\n", pmbbi->name, pRequest->pValStr);
 
             pValStr = strrchr(pRequest->pValStr, ':');
             if ( pValStr == NULL )
-				pValStr = pRequest->pValStr;
+                pValStr = pRequest->pValStr;
             else
-				pValStr++;
+                pValStr++;
 
             /* skip non-digit, particularly because of WIENER crate has ON(1), OFF(0) */
             for (; isdigit(*pValStr) == 0 && *pValStr != '\0'; )
-				++pValStr;
+                ++pValStr;
 
             /* Scan for an integer */
-            if ( pValStr && sscanf( pValStr, "%d", &i32temp ) )
-            {
+            if ( pValStr && sscanf( pValStr, "%d", &i32temp ) ) {
                 pmbbi->rval	= i32temp;
                 pmbbi->udf	= FALSE;
-				rtn = 0;
-			}
-            else
-            {
+                rtn = 0;
+            } else {
                 pmbbi->rval	= -1;
                 recGblSetSevr(pmbbi, READ_ALARM, INVALID_ALARM);
                 errlogPrintf("Record [%s] parsing response [%s] error!\n", pmbbi->name, pValStr);
-				rtn = -1;
-			}
+                rtn = -1;
+            }
         }
     }	/* post-process */
 
@@ -651,6 +655,8 @@ static long read_mbbiDirect_snmp(struct mbbiDirectRecord *pmbbiDirect)
         SNMP_WALK_OID *data = netsnmp_oid_stash_get_data(stashRoot, 
                                                          pRequest->objectId.requestOid,
                                                          pRequest->objectId.requestOidLen);
+        if (!data)
+            return -1;
         pRequest->opDone = 1;
         pRequest->errCode = data->errCode;
         if (data->errCode == SNMP_REQUEST_NO_ERR) {
@@ -662,16 +668,13 @@ static long read_mbbiDirect_snmp(struct mbbiDirectRecord *pmbbiDirect)
         pRequest->errCode = SNMP_REQUEST_NO_ERR;
         pRequest->opDone = 0;
 
-        if(epicsMessageQueueTrySend(pRequest->pSnmpAgent->msgQ_id, (void *)&pRequest, sizeof(SNMP_REQUEST *)) == -1)
-        {
+        if(epicsMessageQueueTrySend(pRequest->pSnmpAgent->msgQ_id, (void *)&pRequest, sizeof(SNMP_REQUEST *)) == -1) {
             recGblSetSevr(pmbbiDirect, READ_ALARM, INVALID_ALARM);
             errlogPrintf("read_mbbiDirect_snmp: epicsMessageQueueTrySend Error on [%s]\n", pmbbiDirect->name);
             rtn = -1;
-        }
-        else
-        {
-			if ( pmbbiDirect->tpro )
-				printf( "read_mbbiDirect_snmp [%s]: Val %d, Sent req, set pact TRUE\n", pmbbiDirect->name, pmbbiDirect->val );
+        } else {
+            if ( pmbbiDirect->tpro )
+                printf( "read_mbbiDirect_snmp [%s]: Val %d, Sent req, set pact TRUE\n", pmbbiDirect->name, pmbbiDirect->val );
             pmbbiDirect->pact = TRUE;
             rtn = 0;
         }
@@ -680,42 +683,37 @@ static long read_mbbiDirect_snmp(struct mbbiDirectRecord *pmbbiDirect)
 
 
     {	/* post-process */
-        if( (!pRequest->opDone) || pRequest->errCode )
-        {
+        if( (!pRequest->opDone) || pRequest->errCode ) {
             recGblSetSevr(pmbbiDirect, READ_ALARM, INVALID_ALARM);
             errlogPrintf("Record [%s] received error code [0x%08x]!\n", pmbbiDirect->name, pRequest->errCode);
             rtn = -1;
-        }
-        else
-        {
-			if ( pmbbiDirect->tpro )
-				printf( "read_mbbiDirect_snmp [%s]: Val %d, received string [%s]\n", pmbbiDirect->name, pmbbiDirect->val, pRequest->pValStr );
-            if(SNMP_DEV_DEBUG > 1)   printf("Record [%s] received string [%s]\n", pmbbiDirect->name, pRequest->pValStr);
+        } else {
+            if ( pmbbiDirect->tpro )
+                printf( "read_mbbiDirect_snmp [%s]: Val %d, received string [%s]\n", pmbbiDirect->name, pmbbiDirect->val, pRequest->pValStr );
+            if(SNMP_DEV_DEBUG > 1)
+                printf("Record [%s] received string [%s]\n", pmbbiDirect->name, pRequest->pValStr);
 
             pValStr = strrchr(pRequest->pValStr, ':');
             if ( pValStr == NULL )
-				pValStr = pRequest->pValStr;
+                pValStr = pRequest->pValStr;
             else
-				pValStr++;
+                pValStr++;
 
             /* skip non-digit, particularly because of WIENER crate has ON(1), OFF(0) */
             for (; isdigit(*pValStr) == 0 && *pValStr != '\0'; )
-				++pValStr;
+                ++pValStr;
 
             /* Scan for an integer */
-            if ( pValStr && sscanf( pValStr, "%d", &i32temp ) )
-            {
+            if ( pValStr && sscanf( pValStr, "%d", &i32temp ) ) {
                 pmbbiDirect->rval	= i32temp;
                 pmbbiDirect->udf	= FALSE;
-				rtn = 0;
-			}
-            else
-            {
+                rtn = 0;
+            } else {
                 pmbbiDirect->rval	= -1;
                 recGblSetSevr(pmbbiDirect, READ_ALARM, INVALID_ALARM);
                 errlogPrintf("Record [%s] parsing response [%s] error!\n", pmbbiDirect->name, pValStr);
-				rtn = -1;
-			}
+                rtn = -1;
+            }
         }
     }	/* post-process */
 
@@ -954,6 +952,8 @@ static long read_bi_snmp(struct biRecord *pbi)
         SNMP_WALK_OID *data = netsnmp_oid_stash_get_data(stashRoot, 
                                                          pRequest->objectId.requestOid,
                                                          pRequest->objectId.requestOidLen);
+        if (!data)
+            return -1;
         pRequest->opDone = 1;
         pRequest->errCode = data->errCode;
         if (data->errCode == SNMP_REQUEST_NO_ERR) {
@@ -1265,6 +1265,8 @@ static long read_si_snmp(struct stringinRecord *psi)
         SNMP_WALK_OID *data = netsnmp_oid_stash_get_data(stashRoot, 
                                                          pRequest->objectId.requestOid,
                                                          pRequest->objectId.requestOidLen);
+        if (!data)
+            return -1;
         pRequest->opDone = 1;
         pRequest->errCode = data->errCode;
         if (data->errCode == SNMP_REQUEST_NO_ERR) {
@@ -1496,6 +1498,8 @@ static long read_wf_snmp(struct waveformRecord *pwf)
         SNMP_WALK_OID *data = netsnmp_oid_stash_get_data(stashRoot, 
                                                          pRequest->objectId.requestOid,
                                                          pRequest->objectId.requestOidLen);
+        if (!data)
+            return -1;
         pRequest->opDone = 1;
         pRequest->errCode = data->errCode;
         if (data->errCode == SNMP_REQUEST_NO_ERR) {

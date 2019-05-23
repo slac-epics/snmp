@@ -38,8 +38,10 @@ static void snmpInit(void)
     init_snmp("epicsSnmp");
 
     /* add_mibdir("/usr/share/snmp/mibs"); */	/* Does not need */
+#if 0
     printf( "reading mibs: ...\n" );
     read_all_mibs();
+#endif
 
     init_mib();
 
