@@ -73,9 +73,10 @@ static int Snmp2cDoWalk(SNMP_WALK *pSnmpWalk)
 
     while (todo) {
         status = snmp_sess_synch_response(pSnmpWalk->agent->pSess, pdu, &response);
-        if (status != STAT_SUCCESS || response->errstat != SNMP_ERR_NOERROR) {
+        if (status != STAT_SUCCESS || (response != NULL && response->errstat != SNMP_ERR_NOERROR)) {
             snmp_perror("Snmp2cWalk: Can't walk?");
-            snmp_free_pdu(response);
+            if (response)
+                snmp_free_pdu(response);
             return 0;
         }
         for (vars = response->variables; vars; vars = vars->next_variable) {
