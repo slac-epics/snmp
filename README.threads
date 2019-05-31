@@ -1,0 +1,13 @@
+Net SNMP is more sensitive to multithreading than previously suspected.
+While this module *is* using the single session API (which is allegedly
+thread-safe if mibs are initially read and each session is handled by
+a single thread), this really doesn't seem to be the case.
+
+In particular, when work was underway for the 24-port Sentry3 IOC (in
+ioc/common/Leviton, because names are completely logical around here),
+the read PVs were put in "public" and the write PVs were put in "private",
+which results in *two* separate threads, one for each community.  The
+Sentry times out a *lot*, and this was causing us to tickle numerous
+problems in the API.
+
+The suggested solution is to use a *single* community for all accesses.
