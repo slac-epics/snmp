@@ -32,9 +32,7 @@ BUILD_FOR_HOST_ARCH=1
 # define INSTALL_LOCATION here
 #INSTALL_LOCATION=<fullpathname>
 
-#NET_SNMP_PKG	= $(PSPKG_ROOT)/release/net-snmp/5.7.2/$(EPICS_HOST_ARCH)/
-#NET_SNMP_PKG	= /reg/neh/home/mcbrowne/netsnmp58
-NET_SNMP_PKG	= /reg/neh/home/mcbrowne/rhel5
+NET_SNMP_PKG	= $(PSPKG_ROOT)/release/net-snmp/5.7.2/$(EPICS_HOST_ARCH)/
 USR_INCLUDES += -I$(NET_SNMP_PKG)/include
 USR_LDFLAGS  += -L$(NET_SNMP_PKG)/lib 
 USR_SYS_LIBS += netsnmp
