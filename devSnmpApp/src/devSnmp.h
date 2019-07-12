@@ -62,6 +62,7 @@
 #include <longinRecord.h>
 #include <longoutRecord.h>
 #include <waveformRecord.h>
+#include <calcoutRecord.h>
 
 #else
 #error "We need EPICS 3.14 or above to support OSI calls!"

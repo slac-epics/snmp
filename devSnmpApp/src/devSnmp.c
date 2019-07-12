@@ -80,6 +80,11 @@ static long init_so_snmpV1(struct stringoutRecord *pso);
 static long init_so_snmpV2c(struct stringoutRecord *pso);
 static long write_so_snmp(struct stringoutRecord *pso);
 
+static long init_co_snmp(struct calcoutRecord *pso, long snmpVersion);
+static long init_co_snmpV1(struct calcoutRecord *pso);
+static long init_co_snmpV2c(struct calcoutRecord *pso);
+static long write_co_snmp(struct calcoutRecord *pso);
+
 static long init_wf_snmp(struct waveformRecord *pwf, long snmpVersion);
 static long init_wf_snmpV1(struct waveformRecord *pwf);
 static long init_wf_snmpV2c(struct waveformRecord *pwf);
@@ -110,6 +115,7 @@ SNMP_DEV_SUP_SET devBoSnmpV1 = {6, NULL, NULL, init_bo_snmpV1,  NULL, write_bo_s
 SNMP_DEV_SUP_SET devLoSnmpV1 = {6, NULL, NULL, init_lo_snmpV1,  NULL, write_lo_snmp, NULL};
 SNMP_DEV_SUP_SET devSiSnmpV1 = {6, NULL, NULL, init_si_snmpV1,  get_ioint_info, read_si_snmp, NULL};
 SNMP_DEV_SUP_SET devSoSnmpV1 = {6, NULL, NULL, init_so_snmpV1,  NULL, write_so_snmp, NULL};
+SNMP_DEV_SUP_SET devCoSnmpV1 = {6, NULL, NULL, init_co_snmpV1,  NULL, write_co_snmp, NULL};
 SNMP_DEV_SUP_SET devWfSnmpV1 = {6, NULL, NULL, init_wf_snmpV1,  get_ioint_info, read_wf_snmp, NULL};
 
 SNMP_DEV_SUP_SET devAiSnmpV2c = {6, NULL, NULL, init_ai_snmpV2c,  get_ioint_info, read_ai_snmp, NULL};
@@ -124,6 +130,7 @@ SNMP_DEV_SUP_SET devBoSnmpV2c={6, NULL, NULL, init_bo_snmpV2c,  NULL, write_bo_s
 SNMP_DEV_SUP_SET devLoSnmpV2c = {6, NULL, NULL, init_lo_snmpV2c,  NULL, write_lo_snmp, NULL};
 SNMP_DEV_SUP_SET devSiSnmpV2c = {6, NULL, NULL, init_si_snmpV2c,  get_ioint_info, read_si_snmp, NULL};
 SNMP_DEV_SUP_SET devSoSnmpV2c = {6, NULL, NULL, init_so_snmpV2c,  NULL, write_so_snmp, NULL};
+SNMP_DEV_SUP_SET devCoSnmpV2c = {6, NULL, NULL, init_co_snmpV2c,  NULL, write_co_snmp, NULL};
 SNMP_DEV_SUP_SET devWfSnmpV2c = {6, NULL, NULL, init_wf_snmpV2c,  get_ioint_info, read_wf_snmp, NULL};
 
 #if EPICS_VERSION>=3 && EPICS_REVISION>=14
@@ -139,6 +146,7 @@ epicsExportAddress(dset, devBoSnmpV1);
 epicsExportAddress(dset, devLoSnmpV1);
 epicsExportAddress(dset, devSiSnmpV1);
 epicsExportAddress(dset, devSoSnmpV1);
+epicsExportAddress(dset, devCoSnmpV1);
 epicsExportAddress(dset, devWfSnmpV1);
 
 epicsExportAddress(dset, devAiSnmpV2c);
@@ -153,6 +161,7 @@ epicsExportAddress(dset, devBoSnmpV2c);
 epicsExportAddress(dset, devLoSnmpV2c);
 epicsExportAddress(dset, devSiSnmpV2c);
 epicsExportAddress(dset, devSoSnmpV2c);
+epicsExportAddress(dset, devCoSnmpV2c);
 epicsExportAddress(dset, devWfSnmpV2c);
 #endif
 
@@ -1440,6 +1449,100 @@ static long write_so_snmp(struct stringoutRecord *pso)
         }
     }/* post-process */
 
+    return 0;
+}
+
+static long init_co_snmp(struct calcoutRecord *pco, long snmpVersion)
+{
+    int status = 0;
+    SNMP_REQUEST  *pRequest;
+    char *pValStr;
+
+    /* co.out must be INST_IO */
+    if(pco->out.type != INST_IO)
+    {
+        recGblRecordError(S_db_badField,(void *)pco, "devCoSnmp (init_record) Illegal INP field");
+        pco->pact = TRUE;
+        return(S_db_badField);
+    }
+
+    status = snmpRequestInit((dbCommon *)pco, pco->out.value.instio.string, snmpVersion, MAX_CA_STRING_SIZE, 1, 'D');
+
+    if (status)
+    {
+        recGblRecordError(S_db_badField, (void *)pco,"devCoSnmp (init_record) bad parameters");
+        pco->pact = TRUE;
+        return(S_db_badField);
+    }
+
+    pRequest = (SNMP_REQUEST *)(pco->dpvt);
+    if(0 == snmpQuerySingleVar(pRequest))
+    {
+        if(SNMP_DEV_DEBUG)   printf("Record [%s] received string [%s] during init.\n", pco->name, pRequest->pValStr);
+        pValStr = strrchr(pRequest->pValStr, ':');
+        if(pValStr == NULL) pValStr = pRequest->pValStr;
+        else pValStr++;
+
+        if (sscanf(pValStr, "%lf", &pco->val))
+        {
+            pco->udf = FALSE;
+            pco->stat=pco->sevr=NO_ALARM;
+        }
+        else
+        {
+            errlogPrintf("Record [%s] parsing response [%s] error!\n", pco->name, pValStr);
+        }
+    }
+
+    return NO_CONVERT;
+}
+
+static long init_co_snmpV1(struct calcoutRecord *pco)
+{
+    return init_co_snmp(pco, SNMP_VERSION_1);
+}
+
+static long init_co_snmpV2c(struct calcoutRecord *pco)
+{
+    return init_co_snmp(pco, SNMP_VERSION_2c);
+}
+
+static long write_co_snmp(struct calcoutRecord *pco)
+{
+    SNMP_REQUEST  *pRequest = (SNMP_REQUEST *)(pco->dpvt);
+
+    if(!pRequest) return(-1);
+
+    if(!pco->pact)
+    {/* pre-process */
+        /* Clean up the request */
+        pRequest->errCode = SNMP_REQUEST_NO_ERR;
+        pRequest->opDone = 0;
+        /* Give the value */
+        /* snprintf(pRequest->pValStr, MAX_CA_STRING_SIZE-1, "%lf", pco->val); */
+        sprintf(pRequest->pValStr, "%lf", pco->val);
+
+        if(epicsMessageQueueTrySend(pRequest->pSnmpAgent->msgQ_id, (void *)&pRequest, sizeof(SNMP_REQUEST *)) == -1)
+        {
+            recGblSetSevr(pco, WRITE_ALARM, INVALID_ALARM);
+            errlogPrintf("write_co_snmp: epicsMessageQueueTrySend Error [%s]\n", pco->name);
+            return -1;
+        }
+        else
+        {
+            pco->pact = TRUE;
+        }
+
+    }/* pre-process */
+    else
+    {/* post-process */
+        if( (!pRequest->opDone) || pRequest->errCode )
+        {
+            recGblSetSevr(pco, WRITE_ALARM, INVALID_ALARM);
+            errlogPrintf("Record [%s] received error code [0x%08x]!\n", pco->name, pRequest->errCode);
+            return -1;
+        }
+    }/* post-process */
     return 0;
 }
 

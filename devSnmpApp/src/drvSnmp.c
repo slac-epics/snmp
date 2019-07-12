@@ -148,6 +148,7 @@ void Snmp2cWalk(char *host, char *community, char *oidname, int count, double de
         /* Search traditional MIB2 and find nothing */
         if (!read_objid(oidname, pSnmpWalk->objectId.requestOid, &pSnmpWalk->objectId.requestOidLen)) {
             snmp_perror("Snmp2cWalk: Parsing objectId");
+            printf("oidname = %s\n", oidname);
             free(pSnmpWalk);
             return;
         }
