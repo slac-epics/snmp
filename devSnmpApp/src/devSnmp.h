@@ -25,7 +25,7 @@
 #include <net-snmp/net-snmp-includes.h>
 
 #include <epicsVersion.h>
-#if EPICS_VERSION>=3 && EPICS_REVISION>=14
+#if EPICS_VERSION>3 || (EPICS_VERSION==3 && EPICS_REVISION>=14)
 #include <epicsExport.h>
 #include <alarm.h>
 #include <dbScan.h>
