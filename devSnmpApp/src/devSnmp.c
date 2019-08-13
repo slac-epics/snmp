@@ -133,7 +133,7 @@ SNMP_DEV_SUP_SET devSoSnmpV2c = {6, NULL, NULL, init_so_snmpV2c,  NULL, write_so
 SNMP_DEV_SUP_SET devCoSnmpV2c = {6, NULL, NULL, init_co_snmpV2c,  NULL, write_co_snmp, NULL};
 SNMP_DEV_SUP_SET devWfSnmpV2c = {6, NULL, NULL, init_wf_snmpV2c,  get_ioint_info, read_wf_snmp, NULL};
 
-#if EPICS_VERSION>=3 && EPICS_REVISION>=14
+#if EPICS_VERSION>3 || (EPICS_VERSION==3 && EPICS_REVISION>=14)
 epicsExportAddress(dset, devAiSnmpV1);
 epicsExportAddress(dset, devAoSnmpV1);
 epicsExportAddress(dset, devLiSnmpV1);

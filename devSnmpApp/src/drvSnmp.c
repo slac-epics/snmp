@@ -1168,7 +1168,7 @@ const struct drvet drvSnmp = {2,                              /*2 Table Entries 
                              (DRVSUPFUN) Snmp_EPICS_Report,  /* Driver Report Routine */
                              (DRVSUPFUN) Snmp_EPICS_Init};   /* Driver Initialization Routine */
 
-#if EPICS_VERSION>=3 && EPICS_REVISION>=14
+#if EPICS_VERSION>3 || (EPICS_VERSION==3 && EPICS_REVISION>=14)
 epicsExportAddress(drvet,drvSnmp);
 #endif
 
