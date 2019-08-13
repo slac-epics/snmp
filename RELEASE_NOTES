@@ -1,3 +1,20 @@
+R2.5: 2019-08-13 Bruce Hill
+	Merge pull request #1 from dirk-zimoch/epics7fix to fix version check macros for EPICS 7
+	Added support for calcout record.
+
+R2.3.8: 2019-06-3 Michael Brown
+	Quiet down this module if no debugging and we get a lot of timeouts.
+	Added a brief description of why using two communities is probably a bad idea here.
+
+R2.3.4: 2019-05-31 Michael Brown
+	snmp_sess_synch_response might free the PDU and return NULL!  Test for this so we don't crash!
+	REMOVE read_all_mibs!!! 
+		Minor changes to protect against core dumps, adjust formatting, and deepen the request queue.
+		The important bit is that the snmp walk routines no longer automatically read all of the
+		available mibs and require explicit read_mib calls.
+		(This was necessary to make walking work in the Leviton app, which tries to support
+		multiple PDUs, some of which have mibs with identical names but different values.)
+
 R2.4:
     S. Stubbs: 11/30/2017
         Added support for mbbiDirect and mbboDirect records
