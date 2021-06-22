@@ -2,6 +2,8 @@ To compile on linux, install the net-snmp-devel linux module
 
 Please see document directory for more info.
 
+Also see /usr/share/snmp/mibs for installed mibs files.
+
 New feature added by SLAC pcds group 11/12/2010.
 Some snmp controlled devices use 'F' instead of 'D' for the
 snmp type character when setting values via snmp cmds.
