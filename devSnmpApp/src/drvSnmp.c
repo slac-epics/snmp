@@ -20,9 +20,11 @@ epicsMutexId snmpAgentListLock;
 
 int SNMP_DRV_DEBUG = 0;
 int snmpMaxVarsPerMsg = 60;	/* Max number of variables per request message */
+int snmpCheckRanges = 0;	/* Enable/disable range checking */
 
 epicsExportAddress( int, SNMP_DRV_DEBUG );
 epicsExportAddress( int, snmpMaxVarsPerMsg );
+epicsExportAddress( int, snmpCheckRanges );
 
 static SNMP_AGENT *snmpGetAgent(char *peerName, char *community, long snmpVersion);
 
@@ -36,6 +38,8 @@ static void snmpInit(void)
 {
     printf( "init_snmp: ...\n" );
     init_snmp("epicsSnmp");
+
+    netsnmp_ds_set_boolean(NETSNMP_DS_LIBRARY_ID,NETSNMP_DS_LIB_DONT_CHECK_RANGE,snmpCheckRanges);
 
     /* add_mibdir("/usr/share/snmp/mibs"); */	/* Does not need */
 #if 0
